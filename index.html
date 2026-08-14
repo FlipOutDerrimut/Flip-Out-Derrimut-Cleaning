@@ -1,96 +1,429 @@
-<script>
-  // --- IndexedDB Browser Storage Helper ---
-  const DB_NAME = 'FlipOutSafetyDB';
-  const STORE_NAME = 'daily_report';
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Flip Out Safety Gateway</title>
+  
+  <!-- Brand Typography: Unbounded -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;700;900&display=swap" rel="stylesheet">
 
-  function openDB() {
-    return new Promise((resolve, reject) => {
-      const request = indexedDB.open(DB_NAME, 1);
-      request.onupgradeneeded = (e) => {
-        const db = e.target.result;
-        if (!db.objectStoreNames.contains(STORE_NAME)) {
-          db.createObjectStore(STORE_NAME);
-        }
-      };
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-  }
-
-  // Save an item (checkbox state, text, or photo file)
-  async function saveLocalItem(key, value) {
-    const db = await openDB();
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    tx.objectStore(STORE_NAME).put(value, key);
-  }
-
-  // Retrieve an item
-  async function getLocalItem(key) {
-    const db = await openDB();
-    return new Promise((resolve) => {
-      const tx = db.transaction(STORE_NAME, 'readonly');
-      const req = tx.objectStore(STORE_NAME).get(key);
-      req.onsuccess = () => resolve(req.result);
-    });
-  }
-
-  // Get all stored checklist data
-  async function getAllLocalData() {
-    const db = await openDB();
-    return new Promise((resolve) => {
-      const tx = db.transaction(STORE_NAME, 'readonly');
-      const store = tx.objectStore(STORE_NAME);
-      const req = store.openCursor();
-      const data = {};
-      
-      req.onsuccess = (e) => {
-        const cursor = e.target.result;
-        if (cursor) {
-          data[cursor.key] = cursor.value;
-          cursor.continue();
-        } else {
-          resolve(data);
-        }
-      };
-    });
-  }
-
-  // Wipe the memory clean (Self-Destruct)
-  async function clearLocalData() {
-    const db = await openDB();
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    tx.objectStore(STORE_NAME).clear();
-  }
-
-  // --- Auto-Save Listener Setup ---
-  document.addEventListener('DOMContentLoaded', async () => {
-    // 1. Restore previous state on page load
-    const savedData = await getAllLocalData();
-    for (const [id, val] of Object.entries(savedData)) {
-      const input = document.getElementById(id);
-      if (input) {
-        if (input.type === 'checkbox') input.checked = val;
-        else if (input.type === 'text' || input.type === 'textarea') input.value = val;
-      }
+  <style>
+    :root {
+      --bg-velvet: #0F041D;
+      --text-white: #FFFFFF;
+      --brand-green: #99C63E;
+      --brand-pink: #FF509F;
+      --brand-purple: #8D2DD3;
+      --card-bg: rgba(255, 255, 255, 0.05);
+      --card-border: rgba(255, 255, 255, 0.12);
     }
 
-    // 2. Auto-save inputs on tap/change
-    document.querySelectorAll('input, textarea').forEach(element => {
-      element.addEventListener('change', async (e) => {
-        if (e.target.type === 'file') {
-          // Store photos as base64 strings locally
-          const file = e.target.files[0];
-          if (file) {
-            const reader = new FileReader();
-            reader.onload = () => saveLocalItem(e.target.id, reader.result);
-            reader.readAsDataURL(file);
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Unbounded', sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-velvet);
+      color: var(--text-white);
+      padding: 24px;
+      min-height: 100vh;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 32px;
+      padding-bottom: 20px;
+      border-bottom: 2px solid var(--brand-purple);
+    }
+
+    h1 {
+      font-size: 1.8rem;
+      font-weight: 900;
+      color: var(--brand-pink);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      font-size: 0.9rem;
+      color: var(--brand-green);
+      font-weight: 600;
+    }
+
+    .section {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 24px;
+      backdrop-filter: blur(10px);
+    }
+
+    .section-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--brand-green);
+      margin-bottom: 16px;
+    }
+
+    .checklist-group {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .checklist-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .checklist-item label {
+      font-size: 0.9rem;
+      font-weight: 400;
+      cursor: pointer;
+      flex: 1;
+      padding-right: 12px;
+    }
+
+    input[type="checkbox"] {
+      appearance: none;
+      width: 28px;
+      height: 28px;
+      border: 2px solid var(--brand-purple);
+      border-radius: 8px;
+      outline: none;
+      cursor: pointer;
+      position: relative;
+      background: transparent;
+      transition: all 0.2s ease;
+      flex-shrink: 0;
+    }
+
+    input[type="checkbox"]:checked {
+      background-color: var(--brand-green);
+      border-color: var(--brand-green);
+    }
+
+    input[type="checkbox"]:checked::after {
+      content: '✓';
+      position: absolute;
+      color: var(--bg-velvet);
+      font-weight: 900;
+      font-size: 18px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    .field-group {
+      margin-top: 16px;
+    }
+
+    .field-label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-white);
+      margin-bottom: 8px;
+      display: block;
+    }
+
+    .input-field {
+      width: 100%;
+      padding: 14px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      color: var(--text-white);
+      font-size: 0.9rem;
+      outline: none;
+    }
+
+    .input-field:focus {
+      border-color: var(--brand-pink);
+    }
+
+    textarea.input-field {
+      min-height: 90px;
+      resize: vertical;
+    }
+
+    .file-input-wrapper {
+      margin-top: 10px;
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    .file-label {
+      display: inline-block;
+      padding: 12px 20px;
+      background: var(--brand-purple);
+      color: var(--text-white);
+      border-radius: 12px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    .file-label:hover {
+      background: var(--brand-pink);
+    }
+
+    .photo-preview {
+      margin-top: 12px;
+      max-width: 100%;
+      max-height: 200px;
+      border-radius: 12px;
+      border: 2px solid var(--brand-green);
+      display: none;
+    }
+
+    .submit-btn {
+      width: 100%;
+      padding: 18px;
+      background: var(--brand-pink);
+      color: var(--text-white);
+      border: none;
+      border-radius: 14px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      transition: transform 0.1s ease, background-color 0.2s ease;
+      margin-top: 16px;
+      box-shadow: 0 4px 20px rgba(255, 80, 159, 0.3);
+    }
+
+    .submit-btn:active {
+      transform: scale(0.98);
+    }
+
+    .submit-btn:disabled {
+      background: #555;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <h1>Flip Out Safety Gateway</h1>
+      <p class="subtitle">Daily Floor & Equipment Checklist</p>
+    </header>
+
+    <form id="checklist-form" onsubmit="event.preventDefault(); submitDailyReport();">
+      
+      <!-- Section 1: Morning Floor Inspection -->
+      <div class="section">
+        <h2 class="section-title">1. Trampoline & Arena Inspection</h2>
+        <div class="checklist-group">
+          <div class="checklist-item">
+            <label for="check_trampoline_mats">Trampoline mats inspected for tears or loose springs</label>
+            <input type="checkbox" id="check_trampoline_mats">
+          </div>
+          <div class="checklist-item">
+            <label for="check_padding">Safety padding secure across all frame areas</label>
+            <input type="checkbox" id="check_padding">
+          </div>
+          <div class="checklist-item">
+            <label for="check_airbag">Main Airbag pressure and landing zone clear</label>
+            <input type="checkbox" id="check_airbag">
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 2: First Aid & Venue Cleanliness -->
+      <div class="section">
+        <h2 class="section-title">2. Venue & Safety Equipment</h2>
+        <div class="checklist-group">
+          <div class="checklist-item">
+            <label for="check_first_aid">First Aid station fully stocked and accessible</label>
+            <input type="checkbox" id="check_first_aid">
+          </div>
+          <div class="checklist-item">
+            <label for="check_exits">Emergency exit doors unlocked and unobstructed</label>
+            <input type="checkbox" id="check_exits">
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 3: Supervisor Sign-Off & Photo Upload -->
+      <div class="section">
+        <h2 class="section-title">3. Supervisor Verification</h2>
+        
+        <div class="field-group">
+          <label class="field-label" for="supervisor_name">Supervisor On Duty</label>
+          <input type="text" id="supervisor_name" class="input-field" placeholder="Enter supervisor name">
+        </div>
+
+        <div class="field-group">
+          <label class="field-label" for="supervisor_notes">Floor Notes / Maintenance Issues</label>
+          <textarea id="supervisor_notes" class="input-field" placeholder="Note any safety concerns or repairs needed..."></textarea>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label">Daily Inspection Photo</label>
+          <div class="file-input-wrapper">
+            <label for="supervisor_photo" class="file-label">📸 Take / Attach Photo</label>
+            <input type="file" id="supervisor_photo" accept="image/*" capture="environment">
+          </div>
+          <img id="photo_preview" class="photo-preview" alt="Inspection Preview">
+        </div>
+      </div>
+
+      <button type="submit" id="submit-btn" class="submit-btn">Submit Daily Report</button>
+    </form>
+  </div>
+
+  <script>
+    // --- IndexedDB Browser Storage Helper ---
+    const DB_NAME = 'FlipOutSafetyDB';
+    const STORE_NAME = 'daily_report';
+
+    function openDB() {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, 1);
+        request.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains(STORE_NAME)) {
+            db.createObjectStore(STORE_NAME);
           }
-        } else if (e.target.type === 'checkbox') {
-          saveLocalItem(e.target.id, e.target.checked);
-        } else {
-          saveLocalItem(e.target.id, e.target.value);
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    async function saveLocalItem(key, value) {
+      const db = await openDB();
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      tx.objectStore(STORE_NAME).put(value, key);
+    }
+
+    async function getAllLocalData() {
+      const db = await openDB();
+      return new Promise((resolve) => {
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.openCursor();
+        const data = {};
+        
+        req.onsuccess = (e) => {
+          const cursor = e.target.result;
+          if (cursor) {
+            data[cursor.key] = cursor.value;
+            cursor.continue();
+          } else {
+            resolve(data);
+          }
+        };
+      });
+    }
+
+    async function clearLocalData() {
+      const db = await openDB();
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      tx.objectStore(STORE_NAME).clear();
+    }
+
+    // --- Restore & Auto-Save Setup ---
+    document.addEventListener('DOMContentLoaded', async () => {
+      // 1. Restore previous state on page load
+      const savedData = await getAllLocalData();
+      for (const [id, val] of Object.entries(savedData)) {
+        const input = document.getElementById(id);
+        if (input) {
+          if (input.type === 'checkbox') {
+            input.checked = val;
+          } else if (input.type === 'text' || input.type === 'textarea') {
+            input.value = val;
+          }
+        } else if (id === 'supervisor_photo' && val) {
+          const preview = document.getElementById('photo_preview');
+          preview.src = val;
+          preview.style.display = 'block';
         }
+      }
+
+      // 2. Auto-save inputs on tap/change
+      document.querySelectorAll('input, textarea').forEach(element => {
+        element.addEventListener('change', async (e) => {
+          if (e.target.type === 'file') {
+            const file = e.target.files[0];
+            if (file) {
+              const reader = new FileReader();
+              reader.onload = () => {
+                saveLocalItem(e.target.id, reader.result);
+                const preview = document.getElementById('photo_preview');
+                preview.src = reader.result;
+                preview.style.display = 'block';
+              };
+              reader.readAsDataURL(file);
+            }
+          } else if (e.target.type === 'checkbox') {
+            saveLocalItem(e.target.id, e.target.checked);
+          } else {
+            saveLocalItem(e.target.id, e.target.value);
+          }
+        });
       });
     });
-  });
-</script>
+
+    // --- Submit to Cloudflare Worker ---
+    async function submitDailyReport() {
+      const submitBtn = document.getElementById('submit-btn');
+      submitBtn.innerText = "Sending Report...";
+      submitBtn.disabled = true;
+
+      try {
+        const reportData = await getAllLocalData();
+
+        // REPLACE THIS URL WITH YOUR CLOUDFLARE WORKER URL
+        const WORKER_URL = 'https://flipout-safety-backend.YOUR-SUBDOMAIN.workers.dev';
+
+        const response = await fetch(WORKER_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(reportData)
+        });
+
+        if (response.ok) {
+          await clearLocalData();
+          alert("Report sent successfully! Clearing local data for tomorrow.");
+          window.location.reload();
+        } else {
+          const errJson = await response.json().catch(() => ({}));
+          throw new Error(errJson.error || "Failed to send report");
+        }
+      } catch (err) {
+        alert("Submission failed: " + err.message);
+        submitBtn.innerText = "Submit Daily Report";
+        submitBtn.disabled = false;
+      }
+    }
+  </script>
+</body>
+</html>

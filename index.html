@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Flip Out Cleaning Checklist</title>
+    
+    <!-- PWA Requirements for iPad -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Cleaning">
+
+    <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --fo-green: #99C63E;
+            --fo-pink: #FF509F;
+            --fo-purple: #8D2DD3;
+            --fo-velvet: #0F041D;
+            --fo-white: #FFFFFF;
+            --fo-card: #1a0a30;
+        }
+        body { 
+            font-family: 'Unbounded', sans-serif; 
+            background-color: var(--fo-velvet); 
+            color: var(--fo-white); 
+            margin: 0; 
+            padding: 20px;
+            display: flex; 
+            flex-direction: column; 
+            align-items: center;
+        }
+        .container { width: 100%; max-width: 800px; }
+        h1 { font-weight: 800; color: var(--fo-green); text-align: center; margin-bottom: 5px; text-transform: uppercase; }
+        h2 { text-align: center; color: var(--fo-pink); font-size: 1.2rem; margin-top: 0; margin-bottom: 30px; }
+        .task-card { background: var(--fo-card); border: 2px solid var(--fo-green); padding: 20px; border-radius: 12px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 15px; }
+        .task-header { display: flex; align-items: center; gap: 15px; }
+        .task-title { font-size: 1.1rem; font-weight: 700; }
+        .custom-checkbox { width: 30px; height: 30px; accent-color: var(--fo-pink); cursor: pointer; }
+        input[type="text"] { width: 100%; padding: 12px; border-radius: 6px; border: 1px solid var(--fo-purple); background: var(--fo-velvet); color: var(--fo-white); box-sizing: border-box; font-family: inherit; }
+        .file-upload-container { display: flex; align-items: center; gap: 10px; }
+        .btn { padding: 15px 25px; font-weight: 800; border-radius: 8px; cursor: pointer; border: none; font-family: inherit; font-size: 0.9rem; text-transform: uppercase; }
+        .btn-green { background-color: var(--fo-green); color: var(--fo-velvet); }
+        .btn-pink { background-color: var(--fo-pink); color: var(--fo-white); }
+        .btn-purple { background-color: var(--fo-purple); color: var(--fo-white); width: 100%; margin-top: 20px;}
+        #supervisor-portal { display: none; background: var(--fo-card); border: 2px dashed var(--fo-pink); padding: 20px; border-radius: 12px; margin-top: 30px; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; color: var(--fo-green); font-size: 0.8rem; margin-bottom: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>FLIP OUT CLEANING ROSTER</h1>
+        <h2 id="current-date">Loading Date...</h2>
+        <div id="checklist-container"></div>
+        <button class="btn btn-green" style="width: 100%; margin-top: 15px;" onclick="submitEndOfDay()">Submit End of Day Report</button>
+        <button class="btn btn-purple" onclick="toggleSupervisorPortal()">Supervisor Access</button>
+        <div id="supervisor-portal">
+            <h3 style="color: var(--fo-pink); text-align: center; margin-top: 0;">SUPERVISOR CONTROLS</h3>
+            <div class="form-group">
+                <label>ADD TEMPORARY JOB (TODAY ONLY)</label>
+                <input type="text" id="temp-job-input" placeholder="Enter temporary task...">
+                <button class="btn btn-green" style="margin-top: 10px; width: 100%;" onclick="addTempJob()">Add to List</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Set the backend URL once your Cloudflare worker is deployed
+        const WORKER_URL = "https://your-worker-name.your-subdomain.workers.dev"; 
+
+        const dateDisplay = document.getElementById('current-date');
+        const today = new Date();
+        dateDisplay.textContent = today.toLocaleDateString('en-AU', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+        let defaultTasks = [
+            "Wipe down all trampoline padding",
+            "Empty bins in the main arena",
+            "Sanitise the foam pit edges"
+        ];
+
+        function renderTasks() {
+            const container = document.getElementById('checklist-container');
+            container.innerHTML = ''; 
+            defaultTasks.forEach((task, index) => {
+                const taskCard = document.createElement('div');
+                taskCard.className = 'task-card';
+                taskCard.innerHTML = `
+                    <div class="task-header">
+                        <input type="checkbox" class="custom-checkbox" id="task-${index}">
+                        <label class="task-title" for="task-${index}">${task}</label>
+                    </div>
+                    <input type="text" placeholder="Worker Name..." id="worker-${index}">
+                    <div class="file-upload-container">
+                        <label style="font-size: 0.8rem; color: var(--fo-pink);">Upload Photo Evidence:</label>
+                        <input type="file" accept="image/*" id="photo-${index}">
+                    </div>
+                `;
+                container.appendChild(taskCard);
+            });
+        }
+
+        function toggleSupervisorPortal() {
+            const portal = document.getElementById('supervisor-portal');
+            portal.style.display = (portal.style.display === 'none' || portal.style.display === '') ? 'block' : 'none';
+        }
+
+        function addTempJob() {
+            const input = document.getElementById('temp-job-input');
+            if(input.value.trim() !== "") {
+                defaultTasks.push(input.value + " (TEMP)");
+                renderTasks();
+                input.value = ""; 
+                alert("Temporary job added!");
+            }
+        }
+
+        async function submitEndOfDay() {
+            alert("Compiling report and uploading photos. Please wait...");
+            
+            const payload = {
+                date: new Date().toISOString(),
+                message: "End of day cleaning completed."
+            };
+
+            try {
+                const response = await fetch(`${WORKER_URL}/submit-report`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if(response.ok) {
+                    alert("Report successfully submitted and sent to admin!");
+                } else {
+                    alert("Error submitting report. Check backend connection.");
+                }
+            } catch (error) {
+                alert("Network error: Could not reach the server.");
+            }
+        }
+
+        renderTasks();
+    </script>
+</body>
+</html>

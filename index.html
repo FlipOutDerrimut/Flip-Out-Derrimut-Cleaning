@@ -339,6 +339,13 @@
       text-align: center;
     }
 
+    .success-message {
+      color: var(--flipout-green);
+      font-size: 0.85rem;
+      margin-top: 0.5rem;
+      text-align: center;
+    }
+
     .section-divider {
       margin: 1.5rem 0 1rem 0;
       padding-top: 1rem;
@@ -388,7 +395,7 @@
 
     <!-- Completed Tasks Bucket -->
     <div id="completed-section" class="hidden">
-      <div class="section-divider">✓ Completed Tasks</div>
+      <div class="section-divider">✓ Completed Tasks (Click to Uncheck)</div>
       <div id="completed-tasks-container"></div>
     </div>
 
@@ -423,7 +430,24 @@
   <!-- 3. BACK OFFICE TASK MANAGER (Logged In) -->
   <div id="back-office-screen" class="container hidden">
     <h1 class="brand-title">Back Office</h1>
-    <div class="sub-title">Manage Checklist Tasks & Requests</div>
+    <div class="sub-title">Manage Tasks & Accounts</div>
+
+    <!-- CREATE SUPERVISOR ACCOUNT FORM -->
+    <form id="create-user-form" style="margin-bottom: 2rem; background: #25123E; padding: 1.25rem; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1);">
+      <h3 style="margin-top: 0; color: var(--flipout-green); font-size: 1.1rem;">👤 Create Supervisor Account</h3>
+      <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <div class="form-group" style="flex: 1; min-width: 200px;">
+          <label for="new-user-email">Supervisor Email</label>
+          <input type="email" id="new-user-email" placeholder="supervisor@flipout.com.au" required />
+        </div>
+        <div class="form-group" style="flex: 1; min-width: 200px;">
+          <label for="new-user-password">Temporary Password</label>
+          <input type="password" id="new-user-password" placeholder="••••••••" required />
+        </div>
+      </div>
+      <button type="submit" class="btn-secondary" style="width: 100%;">Create Account</button>
+      <div id="create-user-msg"></div>
+    </form>
 
     <!-- Task Form -->
     <form id="task-form" style="margin-bottom: 2rem; background: var(--bg-input); padding: 1.25rem; border-radius: 10px;">
@@ -582,7 +606,6 @@
       pendingTasksContainer.innerHTML = `<p style="text-align: center; color: var(--text-muted);">Loading tasks...</p>`;
       completedTasksContainer.innerHTML = '';
 
-      // Fetch approved permanent tasks OR temporary tasks for today
       const { data: tasks, error } = await supabaseClient
         .from('tasks')
         .select('*')
@@ -632,7 +655,7 @@
       return `
         <div class="task-card ${isDone ? 'completed' : ''}" id="card-${task.id}">
           <div class="task-main">
-            <input type="checkbox" class="task-checkbox" id="task-${task.id}" ${isDone ? 'checked disabled' : ''} onchange="toggleTaskComplete('${task.id}')">
+            <input type="checkbox" class="task-checkbox" id="task-${task.id}" ${isDone ? 'checked' : ''} onchange="toggleTaskComplete('${task.id}', this.checked)">
             <label class="task-label" for="task-${task.id}">
               ${task.is_temporary ? '<span class="badge-temp">Today Only</span> ' : ''}
               ${task.title}
@@ -657,23 +680,38 @@
       document.getElementById('progress-bar-fill').style.width = `${percent}%`;
     }
 
-    // Toggle Task Completion
-    window.toggleTaskComplete = async function(taskId) {
-      const initialsInput = document.getElementById(`initials-${taskId}`);
-      const initials = initialsInput ? initialsInput.value.trim() : '';
+    // Toggle Task Completion / Unchecking
+    window.toggleTaskComplete = async function(taskId, isChecking) {
+      if (isChecking) {
+        const initialsInput = document.getElementById(`initials-${taskId}`);
+        const initials = initialsInput ? initialsInput.value.trim() : '';
 
-      const { error } = await supabaseClient.from('task_completions').insert([{
-        task_id: taskId,
-        completed_date: todayISO,
-        initials: initials
-      }]);
+        const { error } = await supabaseClient.from('task_completions').insert([{
+          task_id: taskId,
+          completed_date: todayISO,
+          initials: initials
+        }]);
 
-      if (!error) {
-        completedTaskIds.add(taskId);
-        selectDay(currentSelectedDay);
+        if (!error) {
+          completedTaskIds.add(taskId);
+        } else {
+          alert('Error saving completion: ' + error.message);
+        }
       } else {
-        alert('Error saving completion: ' + error.message);
+        // Unchecking: Remove completion for today
+        const { error } = await supabaseClient.from('task_completions')
+          .delete()
+          .eq('task_id', taskId)
+          .eq('completed_date', todayISO);
+
+        if (!error) {
+          completedTaskIds.delete(taskId);
+        } else {
+          alert('Error unchecking task: ' + error.message);
+        }
       }
+
+      selectDay(currentSelectedDay);
     };
 
     // 3. Back Office Functions
@@ -861,6 +899,29 @@
         selectDay(currentSelectedDay);
       } else {
         alert('Error saving task: ' + result.error.message);
+      }
+    });
+
+    // Create Supervisor User Account
+    document.getElementById('create-user-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('new-user-email').value;
+      const password = document.getElementById('new-user-password').value;
+      const msgDiv = document.getElementById('create-user-msg');
+
+      msgDiv.className = '';
+      msgDiv.textContent = 'Creating account...';
+
+      const { data, error } = await supabaseClient.auth.signUp({ email, password });
+
+      if (error) {
+        msgDiv.className = 'error-message';
+        msgDiv.textContent = 'Error: ' + error.message;
+      } else {
+        msgDiv.className = 'success-message';
+        msgDiv.textContent = `✓ Account created for ${email}!`;
+        document.getElementById('new-user-email').value = '';
+        document.getElementById('new-user-password').value = '';
       }
     });
 

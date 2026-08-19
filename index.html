@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-AU">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -11,12 +11,19 @@
       --flipout-green: #99C63E;
       --flipout-velvet: #0F041D;
       --bg-card: #1A0B2E;
+      --bg-input: #0B0314;
       --text-light: #FFFFFF;
+      --text-muted: #A0A0A0;
+    }
+
+    * {
+      box-sizing: border-box;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }
 
     body {
       margin: 0;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      padding: 1rem;
       background-color: var(--flipout-velvet);
       color: var(--text-light);
       display: flex;
@@ -26,18 +33,29 @@
     }
 
     .container {
-      width: 90%;
-      max-width: 420px;
+      width: 100%;
+      max-width: 480px;
       padding: 2rem;
       background: var(--bg-card);
-      border-radius: 12px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-      border: 1px solid rgba(153, 198, 62, 0.2);
+      border-radius: 16px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+      border: 1px solid rgba(153, 198, 62, 0.25);
     }
 
-    h1, h2 {
-      margin-top: 0;
+    .brand-title {
+      color: var(--flipout-green);
       text-align: center;
+      margin-top: 0;
+      margin-bottom: 0.5rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .sub-title {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      margin-bottom: 2rem;
     }
 
     .form-group {
@@ -48,19 +66,218 @@
       display: block;
       margin-bottom: 0.5rem;
       font-size: 0.9rem;
-      color: #ccc;
+      color: var(--text-muted);
     }
 
-    input {
+    input, select {
       width: 100%;
-      padding: 0.75rem;
-      border-radius: 6px;
-      border: 1px solid #333;
-      background: #0B0314;
+      padding: 0.85rem;
+      border-radius: 8px;
+      border: 1px solid #332244;
+      background: var(--bg-input);
       color: #fff;
-      box-sizing: border-box;
       font-size: 1rem;
     }
+
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--flipout-green);
+    }
+
+    .btn-primary {
+      width: 100%;
+      padding: 0.95rem;
+      border: none;
+      border-radius: 8px;
+      background-color: var(--flipout-green);
+      color: var(--flipout-velvet);
+      font-weight: bold;
+      font-size: 1.05rem;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+
+    .btn-primary:active {
+      transform: scale(0.98);
+    }
+
+    .btn-secondary {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid #443355;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      cursor: pointer;
+      margin-top: 1rem;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .error-message {
+      color: #FF5555;
+      font-size: 0.85rem;
+      margin-top: 0.5rem;
+      text-align: center;
+    }
+
+    /* Day Selection Grid */
+    .day-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-top: 1.5rem;
+    }
+
+    .day-card {
+      background: #25123E;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 1.25rem;
+      border-radius: 10px;
+      text-align: center;
+      cursor: pointer;
+      font-weight: 600;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .day-card:hover {
+      border-color: var(--flipout-green);
+      background: #2E174D;
+    }
+
+    .day-card.today {
+      border-color: var(--flipout-green);
+      box-shadow: 0 0 10px rgba(153, 198, 62, 0.2);
+    }
+
+    .day-card.today::after {
+      content: " (Today)";
+      font-size: 0.75rem;
+      color: var(--flipout-green);
+      display: block;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 1. LOGIN SCREEN -->
+  <div id="login-screen" class="container">
+    <h1 class="brand-title">Flip Out</h1>
+    <div class="sub-title">iPad Checklist Portal</div>
+
+    <form id="login-form">
+      <div class="form-group">
+        <label for="email">Staff Email</label>
+        <input type="email" id="email" placeholder="staff@flipout.com.au" required />
+      </div>
+      <div class="form-group">
+        <label for="password">Password / PIN</label>
+        <input type="password" id="password" placeholder="••••••••" required />
+      </div>
+      <button type="submit" class="btn-primary">Sign In</button>
+      <div id="login-error" class="error-message"></div>
+    </form>
+  </div>
+
+  <!-- 2. MAIN APP DASHBOARD -->
+  <div id="app-screen" class="container hidden">
+    <h1 class="brand-title">Checklists</h1>
+    <div id="user-display" class="sub-title">Select a day to begin</div>
+
+    <div class="day-grid" id="day-grid">
+      <div class="day-card" data-day="monday">Monday</div>
+      <div class="day-card" data-day="tuesday">Tuesday</div>
+      <div class="day-card" data-day="wednesday">Wednesday</div>
+      <div class="day-card" data-day="thursday">Thursday</div>
+      <div class="day-card" data-day="friday">Friday</div>
+      <div class="day-card" data-day="saturday">Saturday</div>
+      <div class="day-card" data-day="sunday" style="grid-column: span 2;">Sunday</div>
+    </div>
+
+    <button id="logout-btn" class="btn-secondary">Log Out</button>
+  </div>
+
+  <script>
+    // Initialise Supabase Client
+    const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+    const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // DOM Elements
+    const loginScreen = document.getElementById('login-screen');
+    const appScreen = document.getElementById('app-screen');
+    const loginForm = document.getElementById('login-form');
+    const loginError = document.getElementById('login-error');
+    const userDisplay = document.getElementById('user-display');
+    const logoutBtn = document.getElementById('logout-btn');
+
+    // Highlight Current Day automatically
+    function highlightToday() {
+      const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+      const todayName = days[new Date().getDay()];
+      const todayCard = document.querySelector(`.day-card[data-day="${todayName}"]`);
+      if (todayCard) {
+        todayCard.classList.add('today');
+      }
+    }
+
+    // Handle Login Submission
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      loginError.textContent = '';
+      
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+      if (error) {
+        loginError.textContent = error.message;
+      } else {
+        showAppScreen(data.user);
+      }
+    });
+
+    // Handle Day Selection
+    document.getElementById('day-grid').addEventListener('click', (e) => {
+      const card = e.target.closest('.day-card');
+      if (card) {
+        const selectedDay = card.dataset.day;
+        alert(`Opening checklist for: ${selectedDay.toUpperCase()}`);
+        // We will connect this to render the specific Word document checklist items next!
+      }
+    });
+
+    // Handle Logout
+    logoutBtn.addEventListener('click', async () => {
+      await supabase.auth.signOut();
+      loginScreen.classList.remove('hidden');
+      appScreen.classList.add('hidden');
+    });
+
+    // Session Check on Load
+    async function checkExistingSession() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        showAppScreen(session.user);
+      }
+    }
+
+    function showAppScreen(user) {
+      userDisplay.textContent = `Logged in as: ${user.email}`;
+      loginScreen.classList.add('hidden');
+      appScreen.classList.remove('hidden');
+      highlightToday();
+    }
+
+    checkExistingSession();
+  </script>
+</body>
+</html>
 
     button {
       width: 100%;

@@ -14,6 +14,7 @@
       --bg-input: #0B0314;
       --text-light: #FFFFFF;
       --text-muted: #A0A0A0;
+      --danger: #FF5555;
     }
 
     * {
@@ -34,7 +35,7 @@
 
     .container {
       width: 100%;
-      max-width: 650px;
+      max-width: 720px;
       padding: 2rem;
       background: var(--bg-card);
       border-radius: 16px;
@@ -83,18 +84,13 @@
       transition: all 0.2s ease;
     }
 
-    .day-tab:hover {
-      border-color: var(--flipout-green);
-      color: #fff;
-    }
-
     .day-tab.active {
       background: var(--flipout-green);
       color: var(--flipout-velvet);
       border-color: var(--flipout-green);
     }
 
-    /* Active Checklist Card */
+    /* Checklist Cards */
     .checklist-header {
       display: flex;
       justify-content: space-between;
@@ -105,19 +101,126 @@
     .checklist-title {
       font-size: 1.25rem;
       font-weight: bold;
-      color: #fff;
       text-transform: capitalize;
     }
 
-    .checklist-body {
+    .task-card {
       background: var(--bg-input);
+      border: 1px solid rgba(255, 255, 255, 0.08);
       border-radius: 10px;
-      padding: 1.5rem;
-      border: 1px solid rgba(255, 255, 255, 0.05);
-      min-height: 200px;
+      padding: 1rem;
+      margin-bottom: 0.85rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
     }
 
-    /* Admin Footer Section */
+    .task-main {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .task-checkbox {
+      width: 22px;
+      height: 22px;
+      margin-top: 2px;
+      accent-color: var(--flipout-green);
+      cursor: pointer;
+    }
+
+    .task-label {
+      font-size: 1rem;
+      flex-grow: 1;
+      line-height: 1.4;
+    }
+
+    .task-meta {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      padding-left: 34px;
+      flex-wrap: wrap;
+    }
+
+    .initials-input {
+      width: 100px;
+      padding: 0.4rem 0.6rem;
+      border-radius: 6px;
+      border: 1px solid #443355;
+      background: #18092B;
+      color: #fff;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+    }
+
+    .photo-upload-btn {
+      background: #2E174D;
+      border: 1px solid var(--flipout-green);
+      color: #fff;
+      padding: 0.4rem 0.75rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Back Office Styles */
+    .admin-task-item {
+      background: #25123E;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 0.75rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .form-group {
+      margin-bottom: 1rem;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 0.4rem;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    input, select {
+      width: 100%;
+      padding: 0.75rem;
+      border-radius: 8px;
+      border: 1px solid #332244;
+      background: var(--bg-input);
+      color: #fff;
+      font-size: 0.95rem;
+    }
+
+    .btn-primary {
+      width: 100%;
+      padding: 0.85rem;
+      border: none;
+      border-radius: 8px;
+      background-color: var(--flipout-green);
+      color: var(--flipout-velvet);
+      font-weight: bold;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+
+    .btn-danger {
+      background: transparent;
+      border: 1px solid var(--danger);
+      color: var(--danger);
+      padding: 0.4rem 0.75rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.8rem;
+    }
+
     .footer {
       margin-top: 2rem;
       text-align: center;
@@ -132,45 +235,12 @@
       cursor: pointer;
     }
 
-    .form-group {
-      margin-bottom: 1.25rem;
-    }
-
-    label {
-      display: block;
-      margin-bottom: 0.5rem;
-      font-size: 0.9rem;
-      color: var(--text-muted);
-    }
-
-    input {
-      width: 100%;
-      padding: 0.85rem;
-      border-radius: 8px;
-      border: 1px solid #332244;
-      background: var(--bg-input);
-      color: #fff;
-      font-size: 1rem;
-    }
-
-    .btn-primary {
-      width: 100%;
-      padding: 0.95rem;
-      border: none;
-      border-radius: 8px;
-      background-color: var(--flipout-green);
-      color: var(--flipout-velvet);
-      font-weight: bold;
-      font-size: 1.05rem;
-      cursor: pointer;
-    }
-
     .hidden {
       display: none !important;
     }
 
     .error-message {
-      color: #FF5555;
+      color: var(--danger);
       font-size: 0.85rem;
       margin-top: 0.5rem;
       text-align: center;
@@ -179,12 +249,11 @@
 </head>
 <body>
 
-  <!-- MAIN CHECKLIST INTERFACE (Default for iPad/Staff) -->
+  <!-- 1. STAFF CHECKLIST VIEW (iPad Default) -->
   <div id="main-app" class="container">
     <h1 class="brand-title">Flip Out</h1>
-    <div class="sub-title">Daily Cleaning & Maintenance Checklist</div>
+    <div class="sub-title">Daily Operations Checklist</div>
 
-    <!-- Day Navigation Bar -->
     <div class="day-selector-container">
       <button class="day-tab" data-day="monday">Mon</button>
       <button class="day-tab" data-day="tuesday">Tue</button>
@@ -195,25 +264,23 @@
       <button class="day-tab" data-day="sunday">Sun</button>
     </div>
 
-    <!-- Active Day Checklist Display -->
     <div class="checklist-header">
-      <div id="active-day-title" class="checklist-title">Today's Checklist</div>
-      <span id="completion-status" style="font-size: 0.85rem; color: var(--flipout-green);">0% Completed</span>
+      <div id="active-day-title" class="checklist-title">Today's Tasks</div>
     </div>
 
-    <div id="checklist-container" class="checklist-body">
-      <p style="color: var(--text-muted); text-align: center;">Loading checklist items...</p>
+    <div id="checklist-container">
+      <p style="text-align: center; color: var(--text-muted);">Loading tasks from database...</p>
     </div>
 
     <div class="footer">
-      <button id="show-admin-btn" class="admin-link">Back Office Login</button>
+      <button id="show-admin-login-btn" class="admin-link">Back Office Access</button>
     </div>
   </div>
 
-  <!-- ADMIN LOGIN MODAL / SCREEN (Hidden by default) -->
-  <div id="admin-screen" class="container hidden">
+  <!-- 2. ADMIN LOGIN SCREEN -->
+  <div id="admin-login-screen" class="container hidden">
     <h1 class="brand-title">Back Office</h1>
-    <div class="sub-title">Admin Authentication</div>
+    <div class="sub-title">Admin Login</div>
 
     <form id="admin-login-form">
       <div class="form-group">
@@ -224,12 +291,58 @@
         <label for="admin-password">Password</label>
         <input type="password" id="admin-password" placeholder="••••••••" required />
       </div>
-      <button type="submit" class="btn-primary">Login to Admin Portal</button>
+      <button type="submit" class="btn-primary">Authenticate</button>
       <div id="admin-error" class="error-message"></div>
     </form>
 
     <div class="footer">
-      <button id="back-to-app-btn" class="admin-link">← Return to Daily Checklist</button>
+      <button id="back-to-app-btn-1" class="admin-link">← Return to Checklist Portal</button>
+    </div>
+  </div>
+
+  <!-- 3. BACK OFFICE TASK MANAGER (Logged In) -->
+  <div id="back-office-screen" class="container hidden">
+    <h1 class="brand-title">Back Office</h1>
+    <div class="sub-title">Manage Checklist Tasks</div>
+
+    <form id="add-task-form" style="margin-bottom: 2rem; background: var(--bg-input); padding: 1.25rem; border-radius: 10px;">
+      <h3 style="margin-top: 0; color: var(--flipout-green); font-size: 1.1rem;">Add New Task</h3>
+      
+      <div class="form-group">
+        <label for="new-task-title">Task Description</label>
+        <input type="text" id="new-task-title" placeholder="e.g. Clean entry glass doors" required />
+      </div>
+
+      <div class="form-group">
+        <label for="new-task-category">Category</label>
+        <select id="new-task-category">
+          <option value="Opening">Opening</option>
+          <option value="Safety Checks">Safety Checks</option>
+          <option value="Cleaning">Cleaning</option>
+          <option value="Closing">Closing</option>
+        </select>
+      </div>
+
+      <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+          <input type="checkbox" id="new-task-photo" style="width: auto;"> Requires Photo
+        </label>
+        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+          <input type="checkbox" id="new-task-initials" checked style="width: auto;"> Requires Initials
+        </label>
+      </div>
+
+      <button type="submit" class="btn-primary">+ Add Task to Database</button>
+    </form>
+
+    <h3 style="margin-bottom: 1rem; font-size: 1.1rem;">Active Task List</h3>
+    <div id="admin-task-list">
+      <p style="text-align: center; color: var(--text-muted);">Loading tasks...</p>
+    </div>
+
+    <div class="footer" style="display: flex; justify-content: space-between;">
+      <button id="logout-btn" class="btn-danger">Sign Out</button>
+      <button id="back-to-app-btn-2" class="admin-link">← Back to Portal</button>
     </div>
   </div>
 
@@ -244,62 +357,178 @@
 
     // DOM Elements
     const mainApp = document.getElementById('main-app');
-    const adminScreen = document.getElementById('admin-screen');
-    const showAdminBtn = document.getElementById('show-admin-btn');
-    const backToAppBtn = document.getElementById('back-to-app-btn');
-    const activeDayTitle = document.getElementById('active-day-title');
+    const adminLoginScreen = document.getElementById('admin-login-screen');
+    const backOfficeScreen = document.getElementById('back-office-screen');
     const checklistContainer = document.getElementById('checklist-container');
+    const adminTaskList = document.getElementById('admin-task-list');
     const dayTabs = document.querySelectorAll('.day-tab');
 
-    // Automatically load current day on page start
-    function initialiseApp() {
+    // 1. Initialise App
+    async function initialiseApp() {
       selectDay(currentSelectedDay);
+      checkSession();
     }
 
-    // Handle Switching Days
-    function selectDay(dayName) {
+    // 2. Select & Fetch Day Tasks from Database
+    async function selectDay(dayName) {
       currentSelectedDay = dayName;
       
-      // Update UI Tabs
       dayTabs.forEach(tab => {
-        if (tab.dataset.day === dayName) {
-          tab.classList.add('active');
-        } else {
-          tab.classList.remove('active');
-        }
+        tab.classList.toggle('active', tab.dataset.day === dayName);
       });
 
-      // Update Header
       const isToday = days[new Date().getDay()] === dayName;
-      activeDayTitle.textContent = `${dayName.toUpperCase()} ${isToday ? '(Today)' : ''}`;
+      document.getElementById('active-day-title').textContent = `${dayName.toUpperCase()} ${isToday ? '(Today)' : ''}`;
 
-      // Load tasks (Placeholder until database connection)
-      renderChecklistItems(dayName);
+      checklistContainer.innerHTML = `<p style="text-align: center; color: var(--text-muted);">Loading tasks...</p>`;
+
+      // Fetch tasks from Supabase that apply to this day
+      const { data: tasks, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .contains('days', [dayName]);
+
+      if (error) {
+        checklistContainer.innerHTML = `<p class="error-message">Error loading tasks: ${error.message}</p>`;
+        return;
+      }
+
+      if (!tasks || tasks.length === 0) {
+        checklistContainer.innerHTML = `<p style="text-align: center; color: var(--text-muted);">No tasks assigned for ${dayName}.</p>`;
+        return;
+      }
+
+      // Render tasks to iPad UI
+      checklistContainer.innerHTML = tasks.map(task => `
+        <div class="task-card">
+          <div class="task-main">
+            <input type="checkbox" class="task-checkbox" id="task-${task.id}">
+            <label class="task-label" for="task-${task.id}">${task.title}</label>
+          </div>
+          <div class="task-meta">
+            ${task.requires_initials ? `<input type="text" class="initials-input" placeholder="Initials" maxlength="4">` : ''}
+            ${task.requires_photo ? `
+              <label class="photo-upload-btn">
+                📷 Take Photo
+                <input type="file" accept="image/*" capture="camera" style="display:none;">
+              </label>
+            ` : ''}
+          </div>
+        </div>
+      `).join('');
     }
 
-    function renderChecklistItems(day) {
-      checklistContainer.innerHTML = `
-        <p style="color: var(--flipout-green); font-weight: 500;">Ready for ${day.toUpperCase()} tasks.</p>
-        <p style="color: var(--text-muted); font-size: 0.9rem;">Tasks and photo upload fields for this day will load here automatically.</p>
-      `;
+    // 3. Back Office Functions
+    async function loadAdminTasks() {
+      const { data: tasks, error } = await supabase.from('tasks').select('*').order('created_at', { ascending: false });
+      
+      if (error || !tasks) {
+        adminTaskList.innerHTML = `<p class="error-message">Could not load tasks.</p>`;
+        return;
+      }
+
+      adminTaskList.innerHTML = tasks.map(task => `
+        <div class="admin-task-item">
+          <div>
+            <strong>${task.title}</strong>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">
+              Category: ${task.category} | Photo: ${task.requires_photo ? 'Yes' : 'No'}
+            </div>
+          </div>
+          <button class="btn-danger" onclick="deleteTask('${task.id}')">Delete</button>
+        </div>
+      `).join('');
     }
 
-    // Tab Click Listeners
-    dayTabs.forEach(tab => {
-      tab.addEventListener('click', () => {
-        selectDay(tab.dataset.day);
-      });
+    // Add New Task
+    document.getElementById('add-task-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const title = document.getElementById('new-task-title').value;
+      const category = document.getElementById('new-task-category').value;
+      const requires_photo = document.getElementById('new-task-photo').checked;
+      const requires_initials = document.getElementById('new-task-initials').checked;
+
+      const { error } = await supabase.from('tasks').insert([{
+        title,
+        category,
+        requires_photo,
+        requires_initials,
+        days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+      }]);
+
+      if (!error) {
+        document.getElementById('new-task-title').value = '';
+        loadAdminTasks();
+        selectDay(currentSelectedDay);
+      } else {
+        alert('Error adding task: ' + error.message);
+      }
     });
 
-    // Navigation Toggle for Back Office
-    showAdminBtn.addEventListener('click', () => {
-      mainApp.classList.add('hidden');
-      adminScreen.classList.remove('hidden');
+    // Delete Task
+    window.deleteTask = async function(id) {
+      if (confirm('Are you sure you want to delete this task?')) {
+        await supabase.from('tasks').delete().eq('id', id);
+        loadAdminTasks();
+        selectDay(currentSelectedDay);
+      }
+    };
+
+    // Auth Handlers
+    document.getElementById('admin-login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('admin-email').value;
+      const password = document.getElementById('admin-password').value;
+
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        document.getElementById('admin-error').textContent = error.message;
+      } else {
+        showBackOffice();
+      }
     });
 
-    backToAppBtn.addEventListener('click', () => {
-      adminScreen.classList.add('hidden');
+    document.getElementById('logout-btn').addEventListener('click', async () => {
+      await supabase.auth.signOut();
+      showMainApp();
+    });
+
+    async function checkSession() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        loadAdminTasks();
+      }
+    }
+
+    function showMainApp() {
       mainApp.classList.remove('hidden');
+      adminLoginScreen.classList.add('hidden');
+      backOfficeScreen.classList.add('hidden');
+    }
+
+    function showBackOffice() {
+      mainApp.classList.add('hidden');
+      adminLoginScreen.classList.add('hidden');
+      backOfficeScreen.classList.remove('hidden');
+      loadAdminTasks();
+    }
+
+    // Event Listeners for View Switching
+    document.getElementById('show-admin-login-btn').addEventListener('click', async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        showBackOffice();
+      } else {
+        mainApp.classList.add('hidden');
+        adminLoginScreen.classList.remove('hidden');
+      }
+    });
+
+    document.getElementById('back-to-app-btn-1').addEventListener('click', showMainApp);
+    document.getElementById('back-to-app-btn-2').addEventListener('click', showMainApp);
+
+    dayTabs.forEach(tab => {
+      tab.addEventListener('click', () => selectDay(tab.dataset.day));
     });
 
     initialiseApp();

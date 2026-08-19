@@ -555,10 +555,9 @@
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-    const todayISO = new Date().toISOString().split('T')[0];
     let currentSelectedDay = days[new Date().getDay()];
+    let currentSelectedDateISO = new Date().toISOString().split('T')[0];
     let allLoadedTasks = [];
-    let completedTaskIds = new Set();
     let activeAdminFilter = 'all';
 
     // DOM Elements
@@ -574,27 +573,30 @@
     const mainDayTabs = document.querySelectorAll('.main-day-tab');
     const adminFilterTabs = document.querySelectorAll('.admin-filter-tab');
 
-    // 1. Initialise App
-    async function initialiseApp() {
-      await fetchTodayCompletions();
-      selectDay(currentSelectedDay);
-      checkSession();
+    // Calculate exact ISO date string (YYYY-MM-DD) for any day tab in the current week
+    function getDateForDayOfWeek(dayName) {
+      const dayMap = { 'sunday': 0, 'monday': 1, 'tuesday': 2, 'wednesday': 3, 'thursday': 4, 'friday': 5, 'saturday': 6 };
+      const targetDayIndex = dayMap[dayName.toLowerCase()];
+      const now = new Date();
+      const currentDayIndex = now.getDay();
+      
+      const diff = targetDayIndex - currentDayIndex;
+      const targetDate = new Date(now);
+      targetDate.setDate(now.getDate() + diff);
+      
+      return targetDate.toISOString().split('T')[0];
     }
 
-    async function fetchTodayCompletions() {
-      const { data: completions } = await supabaseClient
-        .from('task_completions')
-        .select('task_id')
-        .eq('completed_date', todayISO);
-
-      if (completions) {
-        completedTaskIds = new Set(completions.map(c => c.task_id));
-      }
+    // 1. Initialise App
+    async function initialiseApp() {
+      selectDay(currentSelectedDay);
+      checkSession();
     }
 
     // 2. Select & Fetch Day Tasks
     async function selectDay(dayName) {
       currentSelectedDay = dayName;
+      currentSelectedDateISO = getDateForDayOfWeek(dayName);
       
       mainDayTabs.forEach(tab => {
         tab.classList.toggle('active', tab.dataset.day === dayName);
@@ -606,11 +608,20 @@
       pendingTasksContainer.innerHTML = `<p style="text-align: center; color: var(--text-muted);">Loading tasks...</p>`;
       completedTasksContainer.innerHTML = '';
 
+      // Fetch completion records specific to THIS DAY'S calculated date
+      const { data: completions } = await supabaseClient
+        .from('task_completions')
+        .select('task_id')
+        .eq('completed_date', currentSelectedDateISO);
+
+      const dayCompletedTaskIds = new Set(completions ? completions.map(c => c.task_id) : []);
+
+      // Fetch tasks active for this day
       const { data: tasks, error } = await supabaseClient
         .from('tasks')
         .select('*')
         .eq('is_approved', true)
-        .or(`days.cs.{${dayName}},and(is_temporary.eq.true,created_for_date.eq.${todayISO})`)
+        .or(`days.cs.{${dayName}},and(is_temporary.eq.true,created_for_date.eq.${currentSelectedDateISO})`)
         .order('sort_order', { ascending: true });
 
       if (error) {
@@ -629,7 +640,7 @@
       const completedList = [];
 
       tasks.forEach(task => {
-        const isDone = completedTaskIds.has(task.id);
+        const isDone = dayCompletedTaskIds.has(task.id);
         const cardHtml = renderTaskCard(task, isDone);
         if (isDone) {
           completedList.push(cardHtml);
@@ -638,7 +649,7 @@
         }
       });
 
-      pendingTasksContainer.innerHTML = pendingList.length > 0 ? pendingList.join('') : `<p style="text-align: center; color: var(--text-muted); padding: 1rem;">All tasks for today are completed! 🎉</p>`;
+      pendingTasksContainer.innerHTML = pendingList.length > 0 ? pendingList.join('') : `<p style="text-align: center; color: var(--text-muted); padding: 1rem;">All tasks for this day are completed! 🎉</p>`;
       completedTasksContainer.innerHTML = completedList.join('');
 
       if (completedList.length > 0) {
@@ -680,7 +691,7 @@
       document.getElementById('progress-bar-fill').style.width = `${percent}%`;
     }
 
-    // Toggle Task Completion / Unchecking
+    // Toggle Task Completion / Unchecking (BOUND TO SELECTED DAY DATE)
     window.toggleTaskComplete = async function(taskId, isChecking) {
       if (isChecking) {
         const initialsInput = document.getElementById(`initials-${taskId}`);
@@ -688,25 +699,21 @@
 
         const { error } = await supabaseClient.from('task_completions').insert([{
           task_id: taskId,
-          completed_date: todayISO,
+          completed_date: currentSelectedDateISO,
           initials: initials
         }]);
 
-        if (!error) {
-          completedTaskIds.add(taskId);
-        } else {
+        if (error) {
           alert('Error saving completion: ' + error.message);
         }
       } else {
-        // Unchecking: Remove completion for today
+        // Unchecking: Remove completion for the active selected day date
         const { error } = await supabaseClient.from('task_completions')
           .delete()
           .eq('task_id', taskId)
-          .eq('completed_date', todayISO);
+          .eq('completed_date', currentSelectedDateISO);
 
-        if (!error) {
-          completedTaskIds.delete(taskId);
-        } else {
+        if (error) {
           alert('Error unchecking task: ' + error.message);
         }
       }
@@ -887,7 +894,7 @@
           requires_initials,
           is_temporary,
           is_approved,
-          created_for_date: is_temporary ? todayISO : null,
+          created_for_date: is_temporary ? currentSelectedDateISO : null,
           sort_order: nextSortOrder,
           days: selectedDays
         }]);

@@ -15,6 +15,7 @@
       --text-light: #FFFFFF;
       --text-muted: #A0A0A0;
       --danger: #FF5555;
+      --warning: #FFB703;
     }
 
     * {
@@ -178,6 +179,11 @@
       align-items: center;
     }
 
+    .admin-actions {
+      display: flex;
+      gap: 6px;
+    }
+
     .form-group {
       margin-bottom: 1rem;
     }
@@ -199,6 +205,25 @@
       font-size: 0.95rem;
     }
 
+    .days-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 4px;
+      margin-top: 0.4rem;
+    }
+
+    .day-checkbox-label {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      font-size: 0.75rem;
+      background: #18092B;
+      padding: 6px 2px;
+      border-radius: 6px;
+      border: 1px solid #332244;
+      cursor: pointer;
+    }
+
     .btn-primary {
       width: 100%;
       padding: 0.85rem;
@@ -209,6 +234,16 @@
       font-weight: bold;
       font-size: 1rem;
       cursor: pointer;
+    }
+
+    .btn-secondary {
+      background: #2E174D;
+      border: 1px solid var(--flipout-green);
+      color: #fff;
+      padding: 0.4rem 0.75rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.8rem;
     }
 
     .btn-danger {
@@ -305,12 +340,13 @@
     <h1 class="brand-title">Back Office</h1>
     <div class="sub-title">Manage Checklist Tasks</div>
 
-    <form id="add-task-form" style="margin-bottom: 2rem; background: var(--bg-input); padding: 1.25rem; border-radius: 10px;">
-      <h3 style="margin-top: 0; color: var(--flipout-green); font-size: 1.1rem;">Add New Task</h3>
+    <form id="task-form" style="margin-bottom: 2rem; background: var(--bg-input); padding: 1.25rem; border-radius: 10px;">
+      <input type="hidden" id="editing-task-id" value="" />
+      <h3 id="form-heading" style="margin-top: 0; color: var(--flipout-green); font-size: 1.1rem;">Add New Task</h3>
       
       <div class="form-group">
         <label for="new-task-title">Task Description</label>
-        <input type="text" id="new-task-title" placeholder="e.g. Clean entry glass doors" required />
+        <input type="text" id="new-task-title" placeholder="e.g. Disinfect party room tables" required />
       </div>
 
       <div class="form-group">
@@ -323,37 +359,54 @@
         </select>
       </div>
 
-      <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
-        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+      <div class="form-group">
+        <label>Active Days</label>
+        <div class="days-grid">
+          <label class="day-checkbox-label"><input type="checkbox" class="day-check" value="monday" checked> Mon</label>
+          <label class="day-checkbox-label"><input type="checkbox" class="day-check" value="tuesday" checked> Tue</label>
+          <label class="day-checkbox-label"><input type="checkbox" class="day-check" value="wednesday" checked> Wed</label>
+          <label class="day-checkbox-label"><input type="checkbox" class="day-check" value="thursday" checked> Thu</label>
+          <label class="day-checkbox-label"><input type="checkbox" class="day-check" value="friday" checked> Fri</label>
+          <label class="day-checkbox-label"><input type="checkbox" class="day-check" value="saturday" checked> Sat</label>
+          <label class="day-checkbox-label"><input type="checkbox" class="day-check" value="sunday" checked> Sun</label>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 1rem; margin-bottom: 1.25rem;">
+        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.9rem;">
           <input type="checkbox" id="new-task-photo" style="width: auto;"> Requires Photo
         </label>
-        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.9rem;">
           <input type="checkbox" id="new-task-initials" checked style="width: auto;"> Requires Initials
         </label>
       </div>
 
-      <button type="submit" class="btn-primary">+ Add Task to Database</button>
+      <div style="display: flex; gap: 10px;">
+        <button type="submit" id="submit-task-btn" class="btn-primary">+ Save Task to Database</button>
+        <button type="button" id="cancel-edit-btn" class="btn-danger hidden">Cancel Edit</button>
+      </div>
     </form>
 
-    <h3 style="margin-bottom: 1rem; font-size: 1.1rem;">Active Task List</h3>
+    <h3 style="margin-bottom: 1rem; font-size: 1.1rem;">Active Database Tasks</h3>
     <div id="admin-task-list">
       <p style="text-align: center; color: var(--text-muted);">Loading tasks...</p>
     </div>
 
-    <div class="footer" style="display: flex; justify-content: space-between;">
+    <div class="footer" style="display: flex; justify-content: space-between; align-items: center;">
       <button id="logout-btn" class="btn-danger">Sign Out</button>
-      <button id="back-to-app-btn-2" class="admin-link">← Back to Portal</button>
+      <button id="back-to-app-btn-2" class="admin-link">← Return to Portal</button>
     </div>
   </div>
 
   <script>
-    // Initialise Supabase Client (Renamed to avoid Safari variable conflict)
+    // Initialise Supabase Client
     const SUPABASE_URL = 'https://rtgmpmmcplxwezsleclj.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_PxJuEvkUbVmqNlcq-E2sPg_VBn5vI3F';
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
     let currentSelectedDay = days[new Date().getDay()];
+    let allLoadedTasks = [];
 
     // DOM Elements
     const mainApp = document.getElementById('main-app');
@@ -382,7 +435,6 @@
 
       checklistContainer.innerHTML = `<p style="text-align: center; color: var(--text-muted);">Loading tasks...</p>`;
 
-      // Fetch tasks from Supabase that apply to this day
       const { data: tasks, error } = await supabaseClient
         .from('tasks')
         .select('*')
@@ -398,7 +450,6 @@
         return;
       }
 
-      // Render tasks to iPad UI
       checklistContainer.innerHTML = tasks.map(task => `
         <div class="task-card">
           <div class="task-main">
@@ -427,41 +478,104 @@
         return;
       }
 
+      allLoadedTasks = tasks;
+
       adminTaskList.innerHTML = tasks.map(task => `
         <div class="admin-task-item">
-          <div>
+          <div style="flex-grow: 1; padding-right: 12px;">
             <strong>${task.title}</strong>
             <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">
-              Category: ${task.category} | Photo: ${task.requires_photo ? 'Yes' : 'No'}
+              Category: ${task.category} | Days: ${(task.days || []).map(d => d.substring(0,3)).join(', ')}
             </div>
           </div>
-          <button class="btn-danger" onclick="deleteTask('${task.id}')">Delete</button>
+          <div class="admin-actions">
+            <button class="btn-secondary" onclick="startEditTask('${task.id}')">Edit</button>
+            <button class="btn-danger" onclick="deleteTask('${task.id}')">Delete</button>
+          </div>
         </div>
       `).join('');
     }
 
-    // Add New Task
-    document.getElementById('add-task-form').addEventListener('submit', async (e) => {
+    // Edit Existing Task
+    window.startEditTask = function(taskId) {
+      const task = allLoadedTasks.find(t => t.id === taskId);
+      if (!task) return;
+
+      document.getElementById('editing-task-id').value = task.id;
+      document.getElementById('new-task-title').value = task.title;
+      document.getElementById('new-task-category').value = task.category;
+      document.getElementById('new-task-photo').checked = task.requires_photo;
+      document.getElementById('new-task-initials').checked = task.requires_initials;
+
+      // Set active day checkboxes
+      document.querySelectorAll('.day-check').forEach(cb => {
+        cb.checked = (task.days || []).includes(cb.value);
+      });
+
+      document.getElementById('form-heading').textContent = 'Edit Task';
+      document.getElementById('submit-task-btn').textContent = '✓ Update Task';
+      document.getElementById('cancel-edit-btn').classList.remove('hidden');
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    function resetTaskForm() {
+      document.getElementById('editing-task-id').value = '';
+      document.getElementById('new-task-title').value = '';
+      document.getElementById('new-task-category').value = 'Opening';
+      document.getElementById('new-task-photo').checked = false;
+      document.getElementById('new-task-initials').checked = true;
+      document.querySelectorAll('.day-check').forEach(cb => cb.checked = true);
+
+      document.getElementById('form-heading').textContent = 'Add New Task';
+      document.getElementById('submit-task-btn').textContent = '+ Save Task to Database';
+      document.getElementById('cancel-edit-btn').classList.add('hidden');
+    }
+
+    document.getElementById('cancel-edit-btn').addEventListener('click', resetTaskForm);
+
+    // Save or Update Task Handler
+    document.getElementById('task-form').addEventListener('submit', async (e) => {
       e.preventDefault();
+      const editingId = document.getElementById('editing-task-id').value;
       const title = document.getElementById('new-task-title').value;
       const category = document.getElementById('new-task-category').value;
       const requires_photo = document.getElementById('new-task-photo').checked;
       const requires_initials = document.getElementById('new-task-initials').checked;
+      const selectedDays = Array.from(document.querySelectorAll('.day-check:checked')).map(cb => cb.value);
 
-      const { error } = await supabaseClient.from('tasks').insert([{
-        title,
-        category,
-        requires_photo,
-        requires_initials,
-        days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
-      }]);
+      if (selectedDays.length === 0) {
+        alert('Please select at least one active day for this task.');
+        return;
+      }
 
-      if (!error) {
-        document.getElementById('new-task-title').value = '';
+      let result;
+      if (editingId) {
+        // UPDATE existing task
+        result = await supabaseClient.from('tasks').update({
+          title,
+          category,
+          requires_photo,
+          requires_initials,
+          days: selectedDays
+        }).eq('id', editingId);
+      } else {
+        // INSERT new task
+        result = await supabaseClient.from('tasks').insert([{
+          title,
+          category,
+          requires_photo,
+          requires_initials,
+          days: selectedDays
+        }]);
+      }
+
+      if (!result.error) {
+        resetTaskForm();
         loadAdminTasks();
         selectDay(currentSelectedDay);
       } else {
-        alert('Error adding task: ' + error.message);
+        alert('Error saving task: ' + result.error.message);
       }
     });
 
@@ -509,11 +623,11 @@
     function showBackOffice() {
       mainApp.classList.add('hidden');
       adminLoginScreen.classList.add('hidden');
-      backOfficeScreen.remove('hidden');
+      backOfficeScreen.classList.remove('hidden');
       loadAdminTasks();
     }
 
-    // Event Listeners for View Switching
+    // Navigation Listeners
     document.getElementById('show-admin-login-btn').addEventListener('click', async () => {
       const { data: { session } } = await supabaseClient.auth.getSession();
       if (session) {

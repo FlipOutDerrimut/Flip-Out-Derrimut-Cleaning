@@ -60,6 +60,38 @@
       margin-bottom: 1.5rem;
     }
 
+    /* Progress Bar */
+    .progress-wrapper {
+      margin-bottom: 1.5rem;
+      background: var(--bg-input);
+      border-radius: 12px;
+      padding: 1rem;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      font-weight: bold;
+      margin-bottom: 0.5rem;
+    }
+
+    .progress-bar-bg {
+      width: 100%;
+      height: 12px;
+      background: #25123E;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--flipout-green);
+      transition: width 0.4s ease;
+    }
+
     /* Day Selector Navigation */
     .day-selector-container {
       display: flex;
@@ -114,6 +146,12 @@
       display: flex;
       flex-direction: column;
       gap: 0.75rem;
+      transition: opacity 0.3s ease;
+    }
+
+    .task-card.completed {
+      opacity: 0.6;
+      border-color: rgba(153, 198, 62, 0.3);
     }
 
     .task-main {
@@ -134,6 +172,11 @@
       font-size: 1rem;
       flex-grow: 1;
       line-height: 1.4;
+    }
+
+    .task-card.completed .task-label {
+      text-decoration: line-through;
+      color: var(--text-muted);
     }
 
     .task-meta {
@@ -168,6 +211,16 @@
       gap: 6px;
     }
 
+    .badge-temp {
+      background: var(--warning);
+      color: #000;
+      font-size: 0.7rem;
+      font-weight: bold;
+      padding: 2px 6px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+
     /* Back Office Styles */
     .admin-task-item {
       background: #25123E;
@@ -181,7 +234,7 @@
 
     .admin-actions {
       display: flex;
-      gap: 6px;
+      gap: 4px;
     }
 
     .form-group {
@@ -240,7 +293,7 @@
       background: #2E174D;
       border: 1px solid var(--flipout-green);
       color: #fff;
-      padding: 0.4rem 0.75rem;
+      padding: 0.4rem 0.6rem;
       border-radius: 6px;
       cursor: pointer;
       font-size: 0.8rem;
@@ -250,10 +303,15 @@
       background: transparent;
       border: 1px solid var(--danger);
       color: var(--danger);
-      padding: 0.4rem 0.75rem;
+      padding: 0.4rem 0.6rem;
       border-radius: 6px;
       cursor: pointer;
       font-size: 0.8rem;
+    }
+
+    .btn-small {
+      padding: 0.3rem 0.5rem;
+      font-size: 0.75rem;
     }
 
     .footer {
@@ -280,6 +338,15 @@
       margin-top: 0.5rem;
       text-align: center;
     }
+
+    .section-divider {
+      margin: 1.5rem 0 1rem 0;
+      padding-top: 1rem;
+      border-top: 1px dashed rgba(255, 255, 255, 0.15);
+      font-size: 0.95rem;
+      color: var(--flipout-green);
+      font-weight: bold;
+    }
   </style>
 </head>
 <body>
@@ -288,6 +355,17 @@
   <div id="main-app" class="container">
     <h1 class="brand-title">Flip Out</h1>
     <div class="sub-title">Daily Operations Checklist</div>
+
+    <!-- Live Progress Bar -->
+    <div class="progress-wrapper">
+      <div class="progress-header">
+        <span>Completion Progress</span>
+        <span id="progress-percent">0%</span>
+      </div>
+      <div class="progress-bar-bg">
+        <div id="progress-bar-fill" class="progress-bar-fill"></div>
+      </div>
+    </div>
 
     <div class="day-selector-container">
       <button class="day-tab main-day-tab" data-day="monday">Mon</button>
@@ -303,8 +381,15 @@
       <div id="active-day-title" class="checklist-title">Today's Tasks</div>
     </div>
 
-    <div id="checklist-container">
+    <!-- Active Pending Tasks -->
+    <div id="pending-tasks-container">
       <p style="text-align: center; color: var(--text-muted);">Loading tasks from database...</p>
+    </div>
+
+    <!-- Completed Tasks Bucket -->
+    <div id="completed-section" class="hidden">
+      <div class="section-divider">✓ Completed Tasks</div>
+      <div id="completed-tasks-container"></div>
     </div>
 
     <div class="footer">
@@ -315,12 +400,12 @@
   <!-- 2. ADMIN LOGIN SCREEN -->
   <div id="admin-login-screen" class="container hidden">
     <h1 class="brand-title">Back Office</h1>
-    <div class="sub-title">Admin Login</div>
+    <div class="sub-title">Staff & Admin Login</div>
 
     <form id="admin-login-form">
       <div class="form-group">
-        <label for="admin-email">Admin Email</label>
-        <input type="email" id="admin-email" placeholder="admin@flipout.com.au" required />
+        <label for="admin-email">Email</label>
+        <input type="email" id="admin-email" placeholder="user@flipout.com.au" required />
       </div>
       <div class="form-group">
         <label for="admin-password">Password</label>
@@ -338,28 +423,42 @@
   <!-- 3. BACK OFFICE TASK MANAGER (Logged In) -->
   <div id="back-office-screen" class="container hidden">
     <h1 class="brand-title">Back Office</h1>
-    <div class="sub-title">Manage Checklist Tasks</div>
+    <div class="sub-title">Manage Checklist Tasks & Requests</div>
 
+    <!-- Task Form -->
     <form id="task-form" style="margin-bottom: 2rem; background: var(--bg-input); padding: 1.25rem; border-radius: 10px;">
       <input type="hidden" id="editing-task-id" value="" />
       <h3 id="form-heading" style="margin-top: 0; color: var(--flipout-green); font-size: 1.1rem;">Add New Task</h3>
       
       <div class="form-group">
         <label for="new-task-title">Task Description</label>
-        <input type="text" id="new-task-title" placeholder="e.g. Disinfect party room tables" required />
+        <input type="text" id="new-task-title" placeholder="e.g. Inspect party room equipment" required />
       </div>
 
-      <div class="form-group">
-        <label for="new-task-category">Category</label>
-        <select id="new-task-category">
-          <option value="Opening">Opening</option>
-          <option value="Safety Checks">Safety Checks</option>
-          <option value="Cleaning">Cleaning</option>
-          <option value="Closing">Closing</option>
-        </select>
+      <div style="display: flex; gap: 10px;">
+        <div class="form-group" style="flex: 1;">
+          <label for="new-task-category">Category</label>
+          <select id="new-task-category">
+            <option value="Opening">Opening</option>
+            <option value="Safety Checks">Safety Checks</option>
+            <option value="Cleaning">Cleaning</option>
+            <option value="Closing">Closing</option>
+          </select>
+        </div>
+
+        <div class="form-group" style="flex: 1;">
+          <label for="new-task-photos-count">Max Photos Allowed</label>
+          <select id="new-task-photos-count">
+            <option value="1">1 Photo</option>
+            <option value="2">2 Photos</option>
+            <option value="3">3 Photos</option>
+            <option value="4">4 Photos</option>
+            <option value="5">5 Photos</option>
+          </select>
+        </div>
       </div>
 
-      <div class="form-group">
+      <div id="days-selector-group" class="form-group">
         <label>Active Days</label>
         <div class="days-grid">
           <label class="day-checkbox-label"><input type="checkbox" class="day-check" value="monday" checked> Mon</label>
@@ -372,12 +471,18 @@
         </div>
       </div>
 
-      <div style="display: flex; gap: 1rem; margin-bottom: 1.25rem;">
+      <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 1.25rem;">
         <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.9rem;">
-          <input type="checkbox" id="new-task-photo" style="width: auto;"> Requires Photo
+          <input type="checkbox" id="new-task-photo" style="width: auto;"> Requires Photo Upload
         </label>
         <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.9rem;">
           <input type="checkbox" id="new-task-initials" checked style="width: auto;"> Requires Initials
+        </label>
+        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.9rem; color: var(--warning);">
+          <input type="checkbox" id="new-task-temporary" style="width: auto;"> Temporary Task (Today Only)
+        </label>
+        <label id="supervisor-request-toggle" style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.9rem; color: #a0a0a0;">
+          <input type="checkbox" id="new-task-request-approval" style="width: auto;"> Request as Permanent Job (Requires Admin Approval)
         </label>
       </div>
 
@@ -387,11 +492,17 @@
       </div>
     </form>
 
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-      <h3 style="margin: 0; font-size: 1.1rem;">Active Database Tasks</h3>
+    <!-- PENDING APPROVAL QUEUE (Admin View) -->
+    <div id="approval-queue-section" class="hidden">
+      <h3 style="margin-bottom: 0.5rem; font-size: 1.1rem; color: var(--warning);">⏳ Pending Permanent Job Requests</h3>
+      <div id="approval-task-list" style="margin-bottom: 1.5rem;"></div>
     </div>
 
-    <!-- BACK OFFICE DAY FILTER -->
+    <!-- Active Task Management Filter -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+      <h3 style="margin: 0; font-size: 1.1rem;">Active Tasks & Priority Order</h3>
+    </div>
+
     <div class="day-selector-container">
       <button class="day-tab admin-filter-tab active" data-filter="all">All</button>
       <button class="day-tab admin-filter-tab" data-filter="monday">Mon</button>
@@ -420,26 +531,44 @@
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const todayISO = new Date().toISOString().split('T')[0];
     let currentSelectedDay = days[new Date().getDay()];
     let allLoadedTasks = [];
+    let completedTaskIds = new Set();
     let activeAdminFilter = 'all';
 
     // DOM Elements
     const mainApp = document.getElementById('main-app');
     const adminLoginScreen = document.getElementById('admin-login-screen');
     const backOfficeScreen = document.getElementById('back-office-screen');
-    const checklistContainer = document.getElementById('checklist-container');
+    const pendingTasksContainer = document.getElementById('pending-tasks-container');
+    const completedTasksContainer = document.getElementById('completed-tasks-container');
+    const completedSection = document.getElementById('completed-section');
     const adminTaskList = document.getElementById('admin-task-list');
+    const approvalTaskList = document.getElementById('approval-task-list');
+    const approvalQueueSection = document.getElementById('approval-queue-section');
     const mainDayTabs = document.querySelectorAll('.main-day-tab');
     const adminFilterTabs = document.querySelectorAll('.admin-filter-tab');
 
     // 1. Initialise App
     async function initialiseApp() {
+      await fetchTodayCompletions();
       selectDay(currentSelectedDay);
       checkSession();
     }
 
-    // 2. Select & Fetch Day Tasks from Database
+    async function fetchTodayCompletions() {
+      const { data: completions } = await supabaseClient
+        .from('task_completions')
+        .select('task_id')
+        .eq('completed_date', todayISO);
+
+      if (completions) {
+        completedTaskIds = new Set(completions.map(c => c.task_id));
+      }
+    }
+
+    // 2. Select & Fetch Day Tasks
     async function selectDay(dayName) {
       currentSelectedDay = dayName;
       
@@ -450,45 +579,106 @@
       const isToday = days[new Date().getDay()] === dayName;
       document.getElementById('active-day-title').textContent = `${dayName.toUpperCase()} ${isToday ? '(Today)' : ''}`;
 
-      checklistContainer.innerHTML = `<p style="text-align: center; color: var(--text-muted);">Loading tasks...</p>`;
+      pendingTasksContainer.innerHTML = `<p style="text-align: center; color: var(--text-muted);">Loading tasks...</p>`;
+      completedTasksContainer.innerHTML = '';
 
+      // Fetch approved permanent tasks OR temporary tasks for today
       const { data: tasks, error } = await supabaseClient
         .from('tasks')
         .select('*')
-        .contains('days', [dayName]);
+        .eq('is_approved', true)
+        .or(`days.cs.{${dayName}},and(is_temporary.eq.true,created_for_date.eq.${todayISO})`)
+        .order('sort_order', { ascending: true });
 
       if (error) {
-        checklistContainer.innerHTML = `<p class="error-message">Error loading tasks: ${error.message}</p>`;
+        pendingTasksContainer.innerHTML = `<p class="error-message">Error loading tasks: ${error.message}</p>`;
         return;
       }
 
       if (!tasks || tasks.length === 0) {
-        checklistContainer.innerHTML = `<p style="text-align: center; color: var(--text-muted);">No tasks assigned for ${dayName}.</p>`;
+        pendingTasksContainer.innerHTML = `<p style="text-align: center; color: var(--text-muted);">No tasks assigned for ${dayName}.</p>`;
+        updateProgressBar(0, 0);
+        completedSection.classList.add('hidden');
         return;
       }
 
-      checklistContainer.innerHTML = tasks.map(task => `
-        <div class="task-card">
+      const pendingList = [];
+      const completedList = [];
+
+      tasks.forEach(task => {
+        const isDone = completedTaskIds.has(task.id);
+        const cardHtml = renderTaskCard(task, isDone);
+        if (isDone) {
+          completedList.push(cardHtml);
+        } else {
+          pendingList.push(cardHtml);
+        }
+      });
+
+      pendingTasksContainer.innerHTML = pendingList.length > 0 ? pendingList.join('') : `<p style="text-align: center; color: var(--text-muted); padding: 1rem;">All tasks for today are completed! 🎉</p>`;
+      completedTasksContainer.innerHTML = completedList.join('');
+
+      if (completedList.length > 0) {
+        completedSection.classList.remove('hidden');
+      } else {
+        completedSection.classList.add('hidden');
+      }
+
+      updateProgressBar(completedList.length, tasks.length);
+    }
+
+    function renderTaskCard(task, isDone) {
+      const maxPhotos = task.max_photos || 1;
+      return `
+        <div class="task-card ${isDone ? 'completed' : ''}" id="card-${task.id}">
           <div class="task-main">
-            <input type="checkbox" class="task-checkbox" id="task-${task.id}">
-            <label class="task-label" for="task-${task.id}">${task.title}</label>
+            <input type="checkbox" class="task-checkbox" id="task-${task.id}" ${isDone ? 'checked disabled' : ''} onchange="toggleTaskComplete('${task.id}')">
+            <label class="task-label" for="task-${task.id}">
+              ${task.is_temporary ? '<span class="badge-temp">Today Only</span> ' : ''}
+              ${task.title}
+            </label>
           </div>
           <div class="task-meta">
-            ${task.requires_initials ? `<input type="text" class="initials-input" placeholder="Initials" maxlength="4">` : ''}
+            ${task.requires_initials ? `<input type="text" class="initials-input" id="initials-${task.id}" placeholder="Initials" maxlength="4" ${isDone ? 'disabled' : ''}>` : ''}
             ${task.requires_photo ? `
               <label class="photo-upload-btn">
-                📷 Take Photo
-                <input type="file" accept="image/*" capture="camera" style="display:none;">
+                📷 Photos (Up to ${maxPhotos})
+                <input type="file" id="photos-${task.id}" accept="image/*" capture="camera" multiple ${isDone ? 'disabled' : ''} style="display:none;">
               </label>
             ` : ''}
           </div>
         </div>
-      `).join('');
+      `;
     }
+
+    function updateProgressBar(completedCount, totalCount) {
+      const percent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+      document.getElementById('progress-percent').textContent = `${percent}%`;
+      document.getElementById('progress-bar-fill').style.width = `${percent}%`;
+    }
+
+    // Toggle Task Completion
+    window.toggleTaskComplete = async function(taskId) {
+      const initialsInput = document.getElementById(`initials-${taskId}`);
+      const initials = initialsInput ? initialsInput.value.trim() : '';
+
+      const { error } = await supabaseClient.from('task_completions').insert([{
+        task_id: taskId,
+        completed_date: todayISO,
+        initials: initials
+      }]);
+
+      if (!error) {
+        completedTaskIds.add(taskId);
+        selectDay(currentSelectedDay);
+      } else {
+        alert('Error saving completion: ' + error.message);
+      }
+    };
 
     // 3. Back Office Functions
     async function loadAdminTasks() {
-      const { data: tasks, error } = await supabaseClient.from('tasks').select('*').order('created_at', { ascending: false });
+      const { data: tasks, error } = await supabaseClient.from('tasks').select('*').order('sort_order', { ascending: true });
       
       if (error || !tasks) {
         adminTaskList.innerHTML = `<p class="error-message">Could not load tasks.</p>`;
@@ -497,35 +687,89 @@
 
       allLoadedTasks = tasks;
       renderAdminTaskList();
+      renderApprovalQueue();
     }
 
     function renderAdminTaskList() {
-      let filteredTasks = allLoadedTasks;
+      let filteredTasks = allLoadedTasks.filter(t => t.is_approved !== false);
 
       if (activeAdminFilter !== 'all') {
-        filteredTasks = allLoadedTasks.filter(task => (task.days || []).includes(activeAdminFilter));
+        filteredTasks = filteredTasks.filter(task => (task.days || []).includes(activeAdminFilter));
       }
 
       if (filteredTasks.length === 0) {
-        adminTaskList.innerHTML = `<p style="text-align: center; color: var(--text-muted); padding: 1rem;">No tasks found for ${activeAdminFilter.toUpperCase()}.</p>`;
+        adminTaskList.innerHTML = `<p style="text-align: center; color: var(--text-muted); padding: 1rem;">No active tasks for ${activeAdminFilter.toUpperCase()}.</p>`;
         return;
       }
 
-      adminTaskList.innerHTML = filteredTasks.map(task => `
+      adminTaskList.innerHTML = filteredTasks.map((task, index) => `
         <div class="admin-task-item">
           <div style="flex-grow: 1; padding-right: 12px;">
-            <strong>${task.title}</strong>
+            <strong>${task.is_temporary ? '<span class="badge-temp">Today</span> ' : ''}${task.title}</strong>
             <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">
-              Category: ${task.category} | Days: ${(task.days || []).map(d => d.substring(0,3).toUpperCase()).join(', ')}
+              Category: ${task.category} | Max Photos: ${task.max_photos || 1} | Days: ${(task.days || []).map(d => d.substring(0,3).toUpperCase()).join(', ')}
             </div>
           </div>
           <div class="admin-actions">
+            <button class="btn-secondary btn-small" onclick="moveTask('${task.id}', -1)">▲</button>
+            <button class="btn-secondary btn-small" onclick="moveTask('${task.id}', 1)">▼</button>
             <button class="btn-secondary" onclick="startEditTask('${task.id}')">Edit</button>
             <button class="btn-danger" onclick="deleteTask('${task.id}')">Delete</button>
           </div>
         </div>
       `).join('');
     }
+
+    function renderApprovalQueue() {
+      const pendingApproval = allLoadedTasks.filter(t => t.is_approved === false);
+      if (pendingApproval.length === 0) {
+        approvalQueueSection.classList.add('hidden');
+        return;
+      }
+
+      approvalQueueSection.classList.remove('hidden');
+      approvalTaskList.innerHTML = pendingApproval.map(task => `
+        <div class="admin-task-item" style="border: 1px solid var(--warning);">
+          <div>
+            <strong>${task.title}</strong>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">
+              Category: ${task.category} | Submitted by Supervisor
+            </div>
+          </div>
+          <div class="admin-actions">
+            <button class="btn-primary btn-small" onclick="approveTask('${task.id}')">Approve Job</button>
+            <button class="btn-danger btn-small" onclick="deleteTask('${task.id}')">Reject</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Move Task Priority
+    window.moveTask = async function(taskId, direction) {
+      const index = allLoadedTasks.findIndex(t => t.id === taskId);
+      if (index < 0) return;
+
+      const targetIndex = index + direction;
+      if (targetIndex < 0 || targetIndex >= allLoadedTasks.length) return;
+
+      const currentTask = allLoadedTasks[index];
+      const targetTask = allLoadedTasks[targetIndex];
+
+      const currentOrder = currentTask.sort_order || index;
+      const targetOrder = targetTask.sort_order || targetIndex;
+
+      await supabaseClient.from('tasks').update({ sort_order: targetOrder }).eq('id', currentTask.id);
+      await supabaseClient.from('tasks').update({ sort_order: currentOrder }).eq('id', targetTask.id);
+
+      loadAdminTasks();
+      selectDay(currentSelectedDay);
+    };
+
+    window.approveTask = async function(taskId) {
+      await supabaseClient.from('tasks').update({ is_approved: true }).eq('id', taskId);
+      loadAdminTasks();
+      selectDay(currentSelectedDay);
+    };
 
     // Edit Existing Task
     window.startEditTask = function(taskId) {
@@ -535,8 +779,10 @@
       document.getElementById('editing-task-id').value = task.id;
       document.getElementById('new-task-title').value = task.title;
       document.getElementById('new-task-category').value = task.category;
+      document.getElementById('new-task-photos-count').value = task.max_photos || 1;
       document.getElementById('new-task-photo').checked = task.requires_photo;
       document.getElementById('new-task-initials').checked = task.requires_initials;
+      document.getElementById('new-task-temporary').checked = task.is_temporary || false;
 
       document.querySelectorAll('.day-check').forEach(cb => {
         cb.checked = (task.days || []).includes(cb.value);
@@ -553,8 +799,11 @@
       document.getElementById('editing-task-id').value = '';
       document.getElementById('new-task-title').value = '';
       document.getElementById('new-task-category').value = 'Opening';
+      document.getElementById('new-task-photos-count').value = '1';
       document.getElementById('new-task-photo').checked = false;
       document.getElementById('new-task-initials').checked = true;
+      document.getElementById('new-task-temporary').checked = false;
+      document.getElementById('new-task-request-approval').checked = false;
       document.querySelectorAll('.day-check').forEach(cb => cb.checked = true);
 
       document.getElementById('form-heading').textContent = 'Add New Task';
@@ -570,30 +819,38 @@
       const editingId = document.getElementById('editing-task-id').value;
       const title = document.getElementById('new-task-title').value;
       const category = document.getElementById('new-task-category').value;
+      const max_photos = parseInt(document.getElementById('new-task-photos-count').value);
       const requires_photo = document.getElementById('new-task-photo').checked;
       const requires_initials = document.getElementById('new-task-initials').checked;
+      const is_temporary = document.getElementById('new-task-temporary').checked;
+      const requestApproval = document.getElementById('new-task-request-approval').checked;
       const selectedDays = Array.from(document.querySelectorAll('.day-check:checked')).map(cb => cb.value);
 
-      if (selectedDays.length === 0) {
-        alert('Please select at least one active day for this task.');
-        return;
-      }
+      const is_approved = !requestApproval;
 
       let result;
       if (editingId) {
         result = await supabaseClient.from('tasks').update({
           title,
           category,
+          max_photos,
           requires_photo,
           requires_initials,
+          is_temporary,
           days: selectedDays
         }).eq('id', editingId);
       } else {
+        const nextSortOrder = allLoadedTasks.length + 1;
         result = await supabaseClient.from('tasks').insert([{
           title,
           category,
+          max_photos,
           requires_photo,
           requires_initials,
+          is_temporary,
+          is_approved,
+          created_for_date: is_temporary ? todayISO : null,
+          sort_order: nextSortOrder,
           days: selectedDays
         }]);
       }

@@ -23,18 +23,18 @@
 
     body {
       margin: 0;
-      padding: 1rem;
+      padding: 1.5rem 1rem;
       background-color: var(--flipout-velvet);
       color: var(--text-light);
       display: flex;
-      justify-content: center;
+      flex-direction: column;
       align-items: center;
       min-height: 100vh;
     }
 
     .container {
       width: 100%;
-      max-width: 480px;
+      max-width: 650px;
       padding: 2rem;
       background: var(--bg-card);
       border-radius: 16px;
@@ -45,17 +45,91 @@
     .brand-title {
       color: var(--flipout-green);
       text-align: center;
-      margin-top: 0;
-      margin-bottom: 0.5rem;
+      margin: 0 0 0.25rem 0;
       text-transform: uppercase;
-      letter-spacing: 1px;
+      letter-spacing: 1.5px;
+      font-size: 2rem;
     }
 
     .sub-title {
       text-align: center;
       color: var(--text-muted);
       font-size: 0.95rem;
-      margin-bottom: 2rem;
+      margin-bottom: 1.5rem;
+    }
+
+    /* Day Selector Navigation */
+    .day-selector-container {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 8px;
+      margin-bottom: 1.5rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .day-tab {
+      flex: 1;
+      min-width: 70px;
+      padding: 0.6rem 0.4rem;
+      background: #25123E;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      color: var(--text-muted);
+      text-align: center;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .day-tab:hover {
+      border-color: var(--flipout-green);
+      color: #fff;
+    }
+
+    .day-tab.active {
+      background: var(--flipout-green);
+      color: var(--flipout-velvet);
+      border-color: var(--flipout-green);
+    }
+
+    /* Active Checklist Card */
+    .checklist-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    .checklist-title {
+      font-size: 1.25rem;
+      font-weight: bold;
+      color: #fff;
+      text-transform: capitalize;
+    }
+
+    .checklist-body {
+      background: var(--bg-input);
+      border-radius: 10px;
+      padding: 1.5rem;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      min-height: 200px;
+    }
+
+    /* Admin Footer Section */
+    .footer {
+      margin-top: 2rem;
+      text-align: center;
+    }
+
+    .admin-link {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      text-decoration: underline;
+      cursor: pointer;
     }
 
     .form-group {
@@ -69,7 +143,7 @@
       color: var(--text-muted);
     }
 
-    input, select {
+    input {
       width: 100%;
       padding: 0.85rem;
       border-radius: 8px;
@@ -77,11 +151,6 @@
       background: var(--bg-input);
       color: #fff;
       font-size: 1rem;
-    }
-
-    input:focus, select:focus {
-      outline: none;
-      border-color: var(--flipout-green);
     }
 
     .btn-primary {
@@ -94,23 +163,6 @@
       font-weight: bold;
       font-size: 1.05rem;
       cursor: pointer;
-      transition: opacity 0.2s, transform 0.1s;
-    }
-
-    .btn-primary:active {
-      transform: scale(0.98);
-    }
-
-    .btn-secondary {
-      width: 100%;
-      padding: 0.75rem;
-      border: 1px solid #443355;
-      border-radius: 8px;
-      background: transparent;
-      color: var(--text-muted);
-      font-size: 0.9rem;
-      cursor: pointer;
-      margin-top: 1rem;
     }
 
     .hidden {
@@ -123,82 +175,62 @@
       margin-top: 0.5rem;
       text-align: center;
     }
-
-    /* Day Selection Grid */
-    .day-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 12px;
-      margin-top: 1.5rem;
-    }
-
-    .day-card {
-      background: #25123E;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      padding: 1.25rem;
-      border-radius: 10px;
-      text-align: center;
-      cursor: pointer;
-      font-weight: 600;
-      transition: border-color 0.2s, background 0.2s;
-    }
-
-    .day-card:hover {
-      border-color: var(--flipout-green);
-      background: #2E174D;
-    }
-
-    .day-card.today {
-      border-color: var(--flipout-green);
-      box-shadow: 0 0 10px rgba(153, 198, 62, 0.2);
-    }
-
-    .day-card.today::after {
-      content: " (Today)";
-      font-size: 0.75rem;
-      color: var(--flipout-green);
-      display: block;
-      margin-top: 4px;
-    }
   </style>
 </head>
 <body>
 
-  <!-- 1. LOGIN SCREEN -->
-  <div id="login-screen" class="container">
+  <!-- MAIN CHECKLIST INTERFACE (Default for iPad/Staff) -->
+  <div id="main-app" class="container">
     <h1 class="brand-title">Flip Out</h1>
-    <div class="sub-title">iPad Checklist Portal</div>
+    <div class="sub-title">Daily Cleaning & Maintenance Checklist</div>
 
-    <form id="login-form">
-      <div class="form-group">
-        <label for="email">Staff Email</label>
-        <input type="email" id="email" placeholder="staff@flipout.com.au" required />
-      </div>
-      <div class="form-group">
-        <label for="password">Password / PIN</label>
-        <input type="password" id="password" placeholder="••••••••" required />
-      </div>
-      <button type="submit" class="btn-primary">Sign In</button>
-      <div id="login-error" class="error-message"></div>
-    </form>
-  </div>
-
-  <!-- 2. MAIN APP DASHBOARD -->
-  <div id="app-screen" class="container hidden">
-    <h1 class="brand-title">Checklists</h1>
-    <div id="user-display" class="sub-title">Select a day to begin</div>
-
-    <div class="day-grid" id="day-grid">
-      <div class="day-card" data-day="monday">Monday</div>
-      <div class="day-card" data-day="tuesday">Tuesday</div>
-      <div class="day-card" data-day="wednesday">Wednesday</div>
-      <div class="day-card" data-day="thursday">Thursday</div>
-      <div class="day-card" data-day="friday">Friday</div>
-      <div class="day-card" data-day="saturday">Saturday</div>
-      <div class="day-card" data-day="sunday" style="grid-column: span 2;">Sunday</div>
+    <!-- Day Navigation Bar -->
+    <div class="day-selector-container">
+      <button class="day-tab" data-day="monday">Mon</button>
+      <button class="day-tab" data-day="tuesday">Tue</button>
+      <button class="day-tab" data-day="wednesday">Wed</button>
+      <button class="day-tab" data-day="thursday">Thu</button>
+      <button class="day-tab" data-day="friday">Fri</button>
+      <button class="day-tab" data-day="saturday">Sat</button>
+      <button class="day-tab" data-day="sunday">Sun</button>
     </div>
 
-    <button id="logout-btn" class="btn-secondary">Log Out</button>
+    <!-- Active Day Checklist Display -->
+    <div class="checklist-header">
+      <div id="active-day-title" class="checklist-title">Today's Checklist</div>
+      <span id="completion-status" style="font-size: 0.85rem; color: var(--flipout-green);">0% Completed</span>
+    </div>
+
+    <div id="checklist-container" class="checklist-body">
+      <p style="color: var(--text-muted); text-align: center;">Loading checklist items...</p>
+    </div>
+
+    <div class="footer">
+      <button id="show-admin-btn" class="admin-link">Back Office Login</button>
+    </div>
+  </div>
+
+  <!-- ADMIN LOGIN MODAL / SCREEN (Hidden by default) -->
+  <div id="admin-screen" class="container hidden">
+    <h1 class="brand-title">Back Office</h1>
+    <div class="sub-title">Admin Authentication</div>
+
+    <form id="admin-login-form">
+      <div class="form-group">
+        <label for="admin-email">Admin Email</label>
+        <input type="email" id="admin-email" placeholder="admin@flipout.com.au" required />
+      </div>
+      <div class="form-group">
+        <label for="admin-password">Password</label>
+        <input type="password" id="admin-password" placeholder="••••••••" required />
+      </div>
+      <button type="submit" class="btn-primary">Login to Admin Portal</button>
+      <div id="admin-error" class="error-message"></div>
+    </form>
+
+    <div class="footer">
+      <button id="back-to-app-btn" class="admin-link">← Return to Daily Checklist</button>
+    </div>
   </div>
 
   <script>
@@ -207,194 +239,70 @@
     const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // DOM Elements
-    const loginScreen = document.getElementById('login-screen');
-    const appScreen = document.getElementById('app-screen');
-    const loginForm = document.getElementById('login-form');
-    const loginError = document.getElementById('login-error');
-    const userDisplay = document.getElementById('user-display');
-    const logoutBtn = document.getElementById('logout-btn');
-
-    // Highlight Current Day automatically
-    function highlightToday() {
-      const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-      const todayName = days[new Date().getDay()];
-      const todayCard = document.querySelector(`.day-card[data-day="${todayName}"]`);
-      if (todayCard) {
-        todayCard.classList.add('today');
-      }
-    }
-
-    // Handle Login Submission
-    loginForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      loginError.textContent = '';
-      
-      const email = document.getElementById('email').value;
-      const password = document.getElementById('password').value;
-
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-
-      if (error) {
-        loginError.textContent = error.message;
-      } else {
-        showAppScreen(data.user);
-      }
-    });
-
-    // Handle Day Selection
-    document.getElementById('day-grid').addEventListener('click', (e) => {
-      const card = e.target.closest('.day-card');
-      if (card) {
-        const selectedDay = card.dataset.day;
-        alert(`Opening checklist for: ${selectedDay.toUpperCase()}`);
-        // We will connect this to render the specific Word document checklist items next!
-      }
-    });
-
-    // Handle Logout
-    logoutBtn.addEventListener('click', async () => {
-      await supabase.auth.signOut();
-      loginScreen.classList.remove('hidden');
-      appScreen.classList.add('hidden');
-    });
-
-    // Session Check on Load
-    async function checkExistingSession() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        showAppScreen(session.user);
-      }
-    }
-
-    function showAppScreen(user) {
-      userDisplay.textContent = `Logged in as: ${user.email}`;
-      loginScreen.classList.add('hidden');
-      appScreen.classList.remove('hidden');
-      highlightToday();
-    }
-
-    checkExistingSession();
-  </script>
-</body>
-</html>
-
-    button {
-      width: 100%;
-      padding: 0.85rem;
-      border: none;
-      border-radius: 6px;
-      background-color: var(--flipout-green);
-      color: var(--flipout-velvet);
-      font-weight: bold;
-      font-size: 1rem;
-      cursor: pointer;
-      transition: opacity 0.2s;
-    }
-
-    button:hover {
-      opacity: 0.9;
-    }
-
-    .hidden {
-      display: none;
-    }
-
-    .error-message {
-      color: #ff5555;
-      font-size: 0.85rem;
-      margin-top: 0.5rem;
-    }
-  </style>
-</head>
-<body>
-
-  <!-- LOGIN SCREEN -->
-  <div id="login-screen" class="container">
-    <h2>Flip Out Staff Login</h2>
-    <form id="login-form">
-      <div class="form-group">
-        <label for="email">Staff Email</label>
-        <input type="email" id="email" required placeholder="staff@flipout.com.au" />
-      </div>
-      <div class="form-group">
-        <label for="password">Password</label>
-        <input type="password" id="password" required placeholder="••••••••" />
-      </div>
-      <button type="submit">Sign In</button>
-      <div id="login-error" class="error-message"></div>
-    </form>
-  </div>
-
-  <!-- MAIN APP DASHBOARD (Hidden until logged in) -->
-  <div id="app-screen" class="container hidden">
-    <h1 style="color: var(--flipout-green);">Daily Checklists</h1>
-    <p id="user-display" style="text-align: center; font-size: 0.9rem;"></p>
-    
-    <hr style="border-color: rgba(255,255,255,0.1); margin: 1.5rem 0;">
-    
-    <div id="checklist-placeholder">
-      <p style="text-align: center;">Select today's checklist to get started.</p>
-    </div>
-
-    <button id="logout-btn" style="background: transparent; color: #888; border: 1px solid #444; margin-top: 1rem;">
-      Log Out
-    </button>
-  </div>
-
-  <script>
-    // 1. Initialise Supabase Client (Fill these in with your free Supabase credentials)
-    const SUPABASE_URL = 'YOUR_SUPABASE_URL';
-    const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    let currentSelectedDay = days[new Date().getDay()];
 
     // DOM Elements
-    const loginScreen = document.getElementById('login-screen');
-    const appScreen = document.getElementById('app-screen');
-    const loginForm = document.getElementById('login-form');
-    const loginError = document.getElementById('login-error');
-    const userDisplay = document.getElementById('user-display');
-    const logoutBtn = document.getElementById('logout-btn');
+    const mainApp = document.getElementById('main-app');
+    const adminScreen = document.getElementById('admin-screen');
+    const showAdminBtn = document.getElementById('show-admin-btn');
+    const backToAppBtn = document.getElementById('back-to-app-btn');
+    const activeDayTitle = document.getElementById('active-day-title');
+    const checklistContainer = document.getElementById('checklist-container');
+    const dayTabs = document.querySelectorAll('.day-tab');
 
-    // 2. Handle Login Submission
-    loginForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      loginError.textContent = '';
+    // Automatically load current day on page start
+    function initialiseApp() {
+      selectDay(currentSelectedDay);
+    }
+
+    // Handle Switching Days
+    function selectDay(dayName) {
+      currentSelectedDay = dayName;
       
-      const email = document.getElementById('email').value;
-      const password = document.getElementById('password').value;
+      // Update UI Tabs
+      dayTabs.forEach(tab => {
+        if (tab.dataset.day === dayName) {
+          tab.classList.add('active');
+        } else {
+          tab.classList.remove('active');
+        }
+      });
 
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      // Update Header
+      const isToday = days[new Date().getDay()] === dayName;
+      activeDayTitle.textContent = `${dayName.toUpperCase()} ${isToday ? '(Today)' : ''}`;
 
-      if (error) {
-        loginError.textContent = error.message;
-      } else {
-        showAppScreen(data.user);
-      }
-    });
-
-    // 3. Handle Logout
-    logoutBtn.addEventListener('click', async () => {
-      await supabase.auth.signOut();
-      loginScreen.classList.remove('hidden');
-      appScreen.classList.add('hidden');
-    });
-
-    // 4. Session Check on Load
-    async function checkExistingSession() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        showAppScreen(session.user);
-      }
+      // Load tasks (Placeholder until database connection)
+      renderChecklistItems(dayName);
     }
 
-    function showAppScreen(user) {
-      userDisplay.textContent = `Logged in as: ${user.email}`;
-      loginScreen.classList.add('hidden');
-      appScreen.classList.remove('hidden');
+    function renderChecklistItems(day) {
+      checklistContainer.innerHTML = `
+        <p style="color: var(--flipout-green); font-weight: 500;">Ready for ${day.toUpperCase()} tasks.</p>
+        <p style="color: var(--text-muted); font-size: 0.9rem;">Tasks and photo upload fields for this day will load here automatically.</p>
+      `;
     }
 
-    checkExistingSession();
+    // Tab Click Listeners
+    dayTabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        selectDay(tab.dataset.day);
+      });
+    });
+
+    // Navigation Toggle for Back Office
+    showAdminBtn.addEventListener('click', () => {
+      mainApp.classList.add('hidden');
+      adminScreen.classList.remove('hidden');
+    });
+
+    backToAppBtn.addEventListener('click', () => {
+      adminScreen.classList.add('hidden');
+      mainApp.classList.remove('hidden');
+    });
+
+    initialiseApp();
   </script>
 </body>
 </html>

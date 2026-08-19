@@ -6,6 +6,8 @@
   <title>Flip Out - Daily Checklists</title>
   <!-- Supabase JS Client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- EmailJS Client for Admin Notifications -->
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
   <style>
     :root {
       --flipout-green: #99C63E;
@@ -221,7 +223,15 @@
       text-transform: uppercase;
     }
 
-    /* Back Office Styles */
+    /* Back Office & Approval Window Styles */
+    .approval-window {
+      background: #2A1704;
+      border: 2px solid var(--warning);
+      border-radius: 12px;
+      padding: 1.25rem;
+      margin-bottom: 2rem;
+    }
+
     .admin-task-item {
       background: #25123E;
       border-radius: 8px;
@@ -234,7 +244,7 @@
 
     .admin-actions {
       display: flex;
-      gap: 4px;
+      gap: 6px;
     }
 
     .form-group {
@@ -346,6 +356,16 @@
       text-align: center;
     }
 
+    .role-badge {
+      font-size: 0.75rem;
+      background: #332244;
+      color: var(--flipout-green);
+      padding: 2px 8px;
+      border-radius: 12px;
+      text-transform: uppercase;
+      font-weight: bold;
+    }
+
     .section-divider {
       margin: 1.5rem 0 1rem 0;
       padding-top: 1rem;
@@ -407,7 +427,7 @@
   <!-- 2. ADMIN LOGIN SCREEN -->
   <div id="admin-login-screen" class="container hidden">
     <h1 class="brand-title">Back Office</h1>
-    <div class="sub-title">Staff & Admin Login</div>
+    <div class="sub-title">Staff & Supervisor Login</div>
 
     <form id="admin-login-form">
       <div class="form-group">
@@ -429,12 +449,22 @@
 
   <!-- 3. BACK OFFICE TASK MANAGER (Logged In) -->
   <div id="back-office-screen" class="container hidden">
-    <h1 class="brand-title">Back Office</h1>
-    <div class="sub-title">Manage Tasks & Accounts</div>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <h1 class="brand-title" style="margin:0;">Back Office</h1>
+      <span id="user-role-tag" class="role-badge">Supervisor</span>
+    </div>
+    <div class="sub-title" id="user-welcome-email">Logged in</div>
 
-    <!-- CREATE SUPERVISOR ACCOUNT FORM -->
-    <form id="create-user-form" style="margin-bottom: 2rem; background: #25123E; padding: 1.25rem; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1);">
-      <h3 style="margin-top: 0; color: var(--flipout-green); font-size: 1.1rem;">👤 Create Supervisor Account</h3>
+    <!-- DEDICATED ADMIN APPROVAL WINDOW (Visible ONLY to Admin) -->
+    <div id="approval-queue-section" class="approval-window hidden">
+      <h3 style="margin-top: 0; margin-bottom: 0.5rem; font-size: 1.15rem; color: var(--warning);">📥 Pending Job Requests (Admin Approval)</h3>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Review supervisor job submissions below. Click "Approve" to publish or "Reject" to discard.</p>
+      <div id="approval-task-list"></div>
+    </div>
+
+    <!-- CREATE SUPERVISOR ACCOUNT FORM (Admin Only) -->
+    <form id="create-user-form" class="admin-only hidden" style="margin-bottom: 2rem; background: #25123E; padding: 1.25rem; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1);">
+      <h3 style="margin-top: 0; color: var(--flipout-green); font-size: 1.1rem;">👤 Register New Supervisor Account</h3>
       <div style="display: flex; gap: 10px; flex-wrap: wrap;">
         <div class="form-group" style="flex: 1; min-width: 200px;">
           <label for="new-user-email">Supervisor Email</label>
@@ -449,10 +479,10 @@
       <div id="create-user-msg"></div>
     </form>
 
-    <!-- Task Form -->
+    <!-- Task Form (Accessible to Admin & Supervisors) -->
     <form id="task-form" style="margin-bottom: 2rem; background: var(--bg-input); padding: 1.25rem; border-radius: 10px;">
       <input type="hidden" id="editing-task-id" value="" />
-      <h3 id="form-heading" style="margin-top: 0; color: var(--flipout-green); font-size: 1.1rem;">Add New Task</h3>
+      <h3 id="form-heading" style="margin-top: 0; color: var(--flipout-green); font-size: 1.1rem;">Add Job</h3>
       
       <div class="form-group">
         <label for="new-task-title">Task Description</label>
@@ -503,28 +533,19 @@
           <input type="checkbox" id="new-task-initials" checked style="width: auto;"> Requires Initials
         </label>
         <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.9rem; color: var(--warning);">
-          <input type="checkbox" id="new-task-temporary" style="width: auto;"> Temporary Task (Today Only)
-        </label>
-        <label id="supervisor-request-toggle" style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.9rem; color: #a0a0a0;">
-          <input type="checkbox" id="new-task-request-approval" style="width: auto;"> Request as Permanent Job (Requires Admin Approval)
+          <input type="checkbox" id="new-task-temporary" style="width: auto;"> Temporary Job (Today Only)
         </label>
       </div>
 
       <div style="display: flex; gap: 10px;">
-        <button type="submit" id="submit-task-btn" class="btn-primary">+ Save Task to Database</button>
+        <button type="submit" id="submit-task-btn" class="btn-primary">+ Submit Job</button>
         <button type="button" id="cancel-edit-btn" class="btn-danger hidden">Cancel Edit</button>
       </div>
     </form>
 
-    <!-- PENDING APPROVAL QUEUE (Admin View) -->
-    <div id="approval-queue-section" class="hidden">
-      <h3 style="margin-bottom: 0.5rem; font-size: 1.1rem; color: var(--warning);">⏳ Pending Permanent Job Requests</h3>
-      <div id="approval-task-list" style="margin-bottom: 1.5rem;"></div>
-    </div>
-
     <!-- Active Task Management Filter -->
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-      <h3 style="margin: 0; font-size: 1.1rem;">Active Tasks & Priority Order</h3>
+      <h3 style="margin: 0; font-size: 1.1rem;">Active Tasks</h3>
     </div>
 
     <div class="day-selector-container">
@@ -554,11 +575,21 @@
     const SUPABASE_ANON_KEY = 'sb_publishable_PxJuEvkUbVmqNlcq-E2sPg_VBn5vI3F';
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+    // EmailJS Configuration for Admin Notifications (Optional Free Setup)
+    // Register at https://www.emailjs.com/ for free keys
+    const EMAILJS_PUBLIC_KEY = 'YOUR_EMAILJS_PUBLIC_KEY'; 
+    const EMAILJS_SERVICE_ID = 'YOUR_SERVICE_ID';
+    const EMAILJS_TEMPLATE_ID = 'YOUR_TEMPLATE_ID';
+    if (EMAILJS_PUBLIC_KEY !== 'YOUR_EMAILJS_PUBLIC_KEY') {
+      emailjs.init(EMAILJS_PUBLIC_KEY);
+    }
+
     const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
     let currentSelectedDay = days[new Date().getDay()];
     let currentSelectedDateISO = new Date().toISOString().split('T')[0];
     let allLoadedTasks = [];
     let activeAdminFilter = 'all';
+    let currentUserRole = 'supervisor'; // Default fallback role
 
     // DOM Elements
     const mainApp = document.getElementById('main-app');
@@ -573,7 +604,6 @@
     const mainDayTabs = document.querySelectorAll('.main-day-tab');
     const adminFilterTabs = document.querySelectorAll('.admin-filter-tab');
 
-    // Calculate exact ISO date string (YYYY-MM-DD) for any day tab in the current week
     function getDateForDayOfWeek(dayName) {
       const dayMap = { 'sunday': 0, 'monday': 1, 'tuesday': 2, 'wednesday': 3, 'thursday': 4, 'friday': 5, 'saturday': 6 };
       const targetDayIndex = dayMap[dayName.toLowerCase()];
@@ -587,13 +617,13 @@
       return targetDate.toISOString().split('T')[0];
     }
 
-    // 1. Initialise App
+    // Initialise App
     async function initialiseApp() {
       selectDay(currentSelectedDay);
       checkSession();
     }
 
-    // 2. Select & Fetch Day Tasks
+    // Select & Fetch Day Tasks
     async function selectDay(dayName) {
       currentSelectedDay = dayName;
       currentSelectedDateISO = getDateForDayOfWeek(dayName);
@@ -608,7 +638,6 @@
       pendingTasksContainer.innerHTML = `<p style="text-align: center; color: var(--text-muted);">Loading tasks...</p>`;
       completedTasksContainer.innerHTML = '';
 
-      // Fetch completion records specific to THIS DAY'S calculated date
       const { data: completions } = await supabaseClient
         .from('task_completions')
         .select('task_id')
@@ -616,7 +645,6 @@
 
       const dayCompletedTaskIds = new Set(completions ? completions.map(c => c.task_id) : []);
 
-      // Fetch tasks active for this day
       const { data: tasks, error } = await supabaseClient
         .from('tasks')
         .select('*')
@@ -691,7 +719,7 @@
       document.getElementById('progress-bar-fill').style.width = `${percent}%`;
     }
 
-    // Toggle Task Completion / Unchecking (BOUND TO SELECTED DAY DATE)
+    // Toggle Task Completion
     window.toggleTaskComplete = async function(taskId, isChecking) {
       if (isChecking) {
         const initialsInput = document.getElementById(`initials-${taskId}`);
@@ -703,25 +731,20 @@
           initials: initials
         }]);
 
-        if (error) {
-          alert('Error saving completion: ' + error.message);
-        }
+        if (error) alert('Error saving completion: ' + error.message);
       } else {
-        // Unchecking: Remove completion for the active selected day date
         const { error } = await supabaseClient.from('task_completions')
           .delete()
           .eq('task_id', taskId)
           .eq('completed_date', currentSelectedDateISO);
 
-        if (error) {
-          alert('Error unchecking task: ' + error.message);
-        }
+        if (error) alert('Error unchecking task: ' + error.message);
       }
 
       selectDay(currentSelectedDay);
     };
 
-    // 3. Back Office Functions
+    // Back Office & Permissions Logic
     async function loadAdminTasks() {
       const { data: tasks, error } = await supabaseClient.from('tasks').select('*').order('sort_order', { ascending: true });
       
@@ -747,7 +770,9 @@
         return;
       }
 
-      adminTaskList.innerHTML = filteredTasks.map((task, index) => `
+      const isAdmin = currentUserRole === 'admin';
+
+      adminTaskList.innerHTML = filteredTasks.map((task) => `
         <div class="admin-task-item">
           <div style="flex-grow: 1; padding-right: 12px;">
             <strong>${task.is_temporary ? '<span class="badge-temp">Today</span> ' : ''}${task.title}</strong>
@@ -755,17 +780,25 @@
               Category: ${task.category} | Max Photos: ${task.max_photos || 1} | Days: ${(task.days || []).map(d => d.substring(0,3).toUpperCase()).join(', ')}
             </div>
           </div>
-          <div class="admin-actions">
-            <button class="btn-secondary btn-small" onclick="moveTask('${task.id}', -1)">▲</button>
-            <button class="btn-secondary btn-small" onclick="moveTask('${task.id}', 1)">▼</button>
-            <button class="btn-secondary" onclick="startEditTask('${task.id}')">Edit</button>
-            <button class="btn-danger" onclick="deleteTask('${task.id}')">Delete</button>
-          </div>
+          ${isAdmin ? `
+            <div class="admin-actions">
+              <button class="btn-secondary btn-small" onclick="moveTask('${task.id}', -1)">▲</button>
+              <button class="btn-secondary btn-small" onclick="moveTask('${task.id}', 1)">▼</button>
+              <button class="btn-secondary" onclick="startEditTask('${task.id}')">Edit</button>
+              <button class="btn-danger" onclick="deleteTask('${task.id}')">Delete</button>
+            </div>
+          ` : ''}
         </div>
       `).join('');
     }
 
     function renderApprovalQueue() {
+      // ONLY Admin can see the Dedicated Approval Window
+      if (currentUserRole !== 'admin') {
+        approvalQueueSection.classList.add('hidden');
+        return;
+      }
+
       const pendingApproval = allLoadedTasks.filter(t => t.is_approved === false);
       if (pendingApproval.length === 0) {
         approvalQueueSection.classList.add('hidden');
@@ -774,11 +807,11 @@
 
       approvalQueueSection.classList.remove('hidden');
       approvalTaskList.innerHTML = pendingApproval.map(task => `
-        <div class="admin-task-item" style="border: 1px solid var(--warning);">
+        <div class="admin-task-item" style="border: 1px solid var(--warning); background: #1B0D03;">
           <div>
             <strong>${task.title}</strong>
             <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">
-              Category: ${task.category} | Submitted by Supervisor
+              Category: ${task.category} | Days: ${(task.days || []).map(d => d.substring(0,3).toUpperCase()).join(', ')}
             </div>
           </div>
           <div class="admin-actions">
@@ -789,8 +822,9 @@
       `).join('');
     }
 
-    // Move Task Priority
+    // Move Task Priority (Admin Only)
     window.moveTask = async function(taskId, direction) {
+      if (currentUserRole !== 'admin') return;
       const index = allLoadedTasks.findIndex(t => t.id === taskId);
       if (index < 0) return;
 
@@ -811,13 +845,14 @@
     };
 
     window.approveTask = async function(taskId) {
+      if (currentUserRole !== 'admin') return;
       await supabaseClient.from('tasks').update({ is_approved: true }).eq('id', taskId);
       loadAdminTasks();
       selectDay(currentSelectedDay);
     };
 
-    // Edit Existing Task
     window.startEditTask = function(taskId) {
+      if (currentUserRole !== 'admin') return;
       const task = allLoadedTasks.find(t => t.id === taskId);
       if (!task) return;
 
@@ -848,17 +883,16 @@
       document.getElementById('new-task-photo').checked = false;
       document.getElementById('new-task-initials').checked = true;
       document.getElementById('new-task-temporary').checked = false;
-      document.getElementById('new-task-request-approval').checked = false;
       document.querySelectorAll('.day-check').forEach(cb => cb.checked = true);
 
-      document.getElementById('form-heading').textContent = 'Add New Task';
-      document.getElementById('submit-task-btn').textContent = '+ Save Task to Database';
+      document.getElementById('form-heading').textContent = 'Add Job';
+      document.getElementById('submit-task-btn').textContent = '+ Submit Job';
       document.getElementById('cancel-edit-btn').classList.add('hidden');
     }
 
     document.getElementById('cancel-edit-btn').addEventListener('click', resetTaskForm);
 
-    // Save or Update Task Handler
+    // Save or Submit Job Handler
     document.getElementById('task-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const editingId = document.getElementById('editing-task-id').value;
@@ -868,39 +902,33 @@
       const requires_photo = document.getElementById('new-task-photo').checked;
       const requires_initials = document.getElementById('new-task-initials').checked;
       const is_temporary = document.getElementById('new-task-temporary').checked;
-      const requestApproval = document.getElementById('new-task-request-approval').checked;
       const selectedDays = Array.from(document.querySelectorAll('.day-check:checked')).map(cb => cb.value);
 
-      const is_approved = !requestApproval;
+      // If user is admin or job is temporary -> Approved immediately.
+      // If user is supervisor and job is permanent -> Queued for Admin Approval.
+      const is_approved = (currentUserRole === 'admin') || is_temporary;
 
       let result;
       if (editingId) {
         result = await supabaseClient.from('tasks').update({
-          title,
-          category,
-          max_photos,
-          requires_photo,
-          requires_initials,
-          is_temporary,
-          days: selectedDays
+          title, category, max_photos, requires_photo, requires_initials, is_temporary, days: selectedDays
         }).eq('id', editingId);
       } else {
         const nextSortOrder = allLoadedTasks.length + 1;
         result = await supabaseClient.from('tasks').insert([{
-          title,
-          category,
-          max_photos,
-          requires_photo,
-          requires_initials,
-          is_temporary,
-          is_approved,
-          created_for_date: is_temporary ? currentSelectedDateISO : null,
-          sort_order: nextSortOrder,
-          days: selectedDays
+          title, category, max_photos, requires_photo, requires_initials,
+          is_temporary, is_approved, created_for_date: is_temporary ? currentSelectedDateISO : null,
+          sort_order: nextSortOrder, days: selectedDays
         }]);
       }
 
       if (!result.error) {
+        if (!is_approved) {
+          alert('✓ Job request submitted! An admin will review it shortly.');
+          notifyAdminViaEmail(title);
+        } else {
+          alert('✓ Job saved successfully!');
+        }
         resetTaskForm();
         loadAdminTasks();
         selectDay(currentSelectedDay);
@@ -909,7 +937,17 @@
       }
     });
 
-    // Create Supervisor User Account
+    // Send Email Notification to Admin
+    function notifyAdminViaEmail(jobTitle) {
+      if (typeof emailjs !== 'undefined' && EMAILJS_PUBLIC_KEY !== 'YOUR_EMAILJS_PUBLIC_KEY') {
+        emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+          job_title: jobTitle,
+          submission_date: new Date().toLocaleString('en-AU')
+        });
+      }
+    }
+
+    // Register Supervisor User Account with 'supervisor' role in metadata
     document.getElementById('create-user-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const email = document.getElementById('new-user-email').value;
@@ -917,24 +955,30 @@
       const msgDiv = document.getElementById('create-user-msg');
 
       msgDiv.className = '';
-      msgDiv.textContent = 'Creating account...';
+      msgDiv.textContent = 'Creating supervisor account...';
 
-      const { data, error } = await supabaseClient.auth.signUp({ email, password });
+      const { data, error } = await supabaseClient.auth.signUp({
+        email: email,
+        password: password,
+        options: {
+          data: { role: 'supervisor' } // Tag account with supervisor role
+        }
+      });
 
       if (error) {
         msgDiv.className = 'error-message';
         msgDiv.textContent = 'Error: ' + error.message;
       } else {
         msgDiv.className = 'success-message';
-        msgDiv.textContent = `✓ Account created for ${email}!`;
+        msgDiv.textContent = `✓ Supervisor account created for ${email}!`;
         document.getElementById('new-user-email').value = '';
         document.getElementById('new-user-password').value = '';
       }
     });
 
-    // Delete Task
+    // Delete / Reject Task
     window.deleteTask = async function(id) {
-      if (confirm('Are you sure you want to delete this task?')) {
+      if (confirm('Are you sure you want to remove this job?')) {
         await supabaseClient.from('tasks').delete().eq('id', id);
         loadAdminTasks();
         selectDay(currentSelectedDay);
@@ -963,7 +1007,23 @@
     async function checkSession() {
       const { data: { session } } = await supabaseClient.auth.getSession();
       if (session) {
+        applyUserPermissions(session.user);
         loadAdminTasks();
+      }
+    }
+
+    function applyUserPermissions(user) {
+      document.getElementById('user-welcome-email').textContent = user.email;
+      const role = user.user_metadata?.role || (user.email.includes('admin') ? 'admin' : 'supervisor');
+      currentUserRole = role;
+
+      const roleBadge = document.getElementById('user-role-tag');
+      roleBadge.textContent = role;
+
+      if (role === 'admin') {
+        document.querySelectorAll('.admin-only').forEach(el => el.classList.remove('hidden'));
+      } else {
+        document.querySelectorAll('.admin-only').forEach(el => el.classList.add('hidden'));
       }
     }
 
@@ -977,7 +1037,7 @@
       mainApp.classList.add('hidden');
       adminLoginScreen.classList.add('hidden');
       backOfficeScreen.classList.remove('hidden');
-      loadAdminTasks();
+      checkSession();
     }
 
     // Navigation Listeners

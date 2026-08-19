@@ -347,10 +347,10 @@
   </div>
 
   <script>
-    // Initialise Supabase Client
+    // Initialise Supabase Client (Renamed to avoid Safari variable conflict)
     const SUPABASE_URL = 'https://rtgmpmmcplxwezsleclj.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_PxJuEvkUbVmqNlcq-E2sPg_VBn5vI3F';
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
     let currentSelectedDay = days[new Date().getDay()];
@@ -383,7 +383,7 @@
       checklistContainer.innerHTML = `<p style="text-align: center; color: var(--text-muted);">Loading tasks...</p>`;
 
       // Fetch tasks from Supabase that apply to this day
-      const { data: tasks, error } = await supabase
+      const { data: tasks, error } = await supabaseClient
         .from('tasks')
         .select('*')
         .contains('days', [dayName]);
@@ -420,7 +420,7 @@
 
     // 3. Back Office Functions
     async function loadAdminTasks() {
-      const { data: tasks, error } = await supabase.from('tasks').select('*').order('created_at', { ascending: false });
+      const { data: tasks, error } = await supabaseClient.from('tasks').select('*').order('created_at', { ascending: false });
       
       if (error || !tasks) {
         adminTaskList.innerHTML = `<p class="error-message">Could not load tasks.</p>`;
@@ -448,7 +448,7 @@
       const requires_photo = document.getElementById('new-task-photo').checked;
       const requires_initials = document.getElementById('new-task-initials').checked;
 
-      const { error } = await supabase.from('tasks').insert([{
+      const { error } = await supabaseClient.from('tasks').insert([{
         title,
         category,
         requires_photo,
@@ -468,7 +468,7 @@
     // Delete Task
     window.deleteTask = async function(id) {
       if (confirm('Are you sure you want to delete this task?')) {
-        await supabase.from('tasks').delete().eq('id', id);
+        await supabaseClient.from('tasks').delete().eq('id', id);
         loadAdminTasks();
         selectDay(currentSelectedDay);
       }
@@ -480,7 +480,7 @@
       const email = document.getElementById('admin-email').value;
       const password = document.getElementById('admin-password').value;
 
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
       if (error) {
         document.getElementById('admin-error').textContent = error.message;
       } else {
@@ -489,12 +489,12 @@
     });
 
     document.getElementById('logout-btn').addEventListener('click', async () => {
-      await supabase.auth.signOut();
+      await supabaseClient.auth.signOut();
       showMainApp();
     });
 
     async function checkSession() {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await supabaseClient.auth.getSession();
       if (session) {
         loadAdminTasks();
       }
@@ -509,13 +509,13 @@
     function showBackOffice() {
       mainApp.classList.add('hidden');
       adminLoginScreen.classList.add('hidden');
-      backOfficeScreen.classList.remove('hidden');
+      backOfficeScreen.remove('hidden');
       loadAdminTasks();
     }
 
     // Event Listeners for View Switching
     document.getElementById('show-admin-login-btn').addEventListener('click', async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await supabaseClient.auth.getSession();
       if (session) {
         showBackOffice();
       } else {

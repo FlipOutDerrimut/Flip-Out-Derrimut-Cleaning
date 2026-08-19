@@ -4,6 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Flip Out - Daily Checklists</title>
+
+  <!-- iPad Kiosk & PWA Meta Tags -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Flip Out Clean">
+
   <!-- Supabase JS Client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- EmailJS Client for Admin Notifications -->
@@ -309,6 +315,17 @@
       font-size: 0.8rem;
     }
 
+    .btn-success {
+      background: #198754;
+      border: 1px solid var(--flipout-green);
+      color: #fff;
+      padding: 0.6rem 1rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: bold;
+    }
+
     .btn-danger {
       background: transparent;
       border: 1px solid var(--danger);
@@ -449,11 +466,19 @@
 
   <!-- 3. BACK OFFICE TASK MANAGER (Logged In) -->
   <div id="back-office-screen" class="container hidden">
-    <div style="display: flex; justify-content: space-between; align-items: center;">
-      <h1 class="brand-title" style="margin:0;">Back Office</h1>
-      <span id="user-role-tag" class="role-badge">Supervisor</span>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+      <div>
+        <h1 class="brand-title" style="margin:0; text-align: left;">Back Office</h1>
+        <div class="sub-title" id="user-welcome-email" style="margin-bottom:0; text-align: left;">Logged in</div>
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
+        <span id="user-role-tag" class="role-badge">Supervisor</span>
+        <!-- CSV Export Button (Admin Only) -->
+        <button id="export-csv-btn" onclick="exportCompletionsToCSV()" class="btn-success admin-only hidden">
+          📥 Export Audit Log (CSV)
+        </button>
+      </div>
     </div>
-    <div class="sub-title" id="user-welcome-email">Logged in</div>
 
     <!-- DEDICATED ADMIN APPROVAL WINDOW (Visible ONLY to Admin) -->
     <div id="approval-queue-section" class="approval-window hidden">
@@ -575,8 +600,7 @@
     const SUPABASE_ANON_KEY = 'sb_publishable_PxJuEvkUbVmqNlcq-E2sPg_VBn5vI3F';
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // EmailJS Configuration for Admin Notifications (Optional Free Setup)
-    // Register at https://www.emailjs.com/ for free keys
+    // EmailJS Configuration for Admin Notifications
     const EMAILJS_PUBLIC_KEY = 'YOUR_EMAILJS_PUBLIC_KEY'; 
     const EMAILJS_SERVICE_ID = 'YOUR_SERVICE_ID';
     const EMAILJS_TEMPLATE_ID = 'YOUR_TEMPLATE_ID';
@@ -705,8 +729,9 @@
             ${task.requires_photo ? `
               <label class="photo-upload-btn">
                 📷 Photos (Up to ${maxPhotos})
-                <input type="file" id="photos-${task.id}" accept="image/*" capture="camera" multiple ${isDone ? 'disabled' : ''} style="display:none;">
+                <input type="file" id="photos-${task.id}" accept="image/*" capture="camera" multiple ${isDone ? 'disabled' : ''} style="display:none;" onchange="handleTaskPhotoSelect(this, '${task.id}')">
               </label>
+              <span id="photo-filename-${task.id}" style="font-size:0.75rem; color: var(--flipout-green);"></span>
             ` : ''}
           </div>
         </div>
@@ -719,16 +744,52 @@
       document.getElementById('progress-bar-fill').style.width = `${percent}%`;
     }
 
-    // Toggle Task Completion
+    // Handle Image Selection and Storage Bucket Upload
+    window.handleTaskPhotoSelect = async function(fileInput, taskId) {
+      const files = fileInput.files;
+      if (!files || files.length === 0) return;
+
+      const file = files[0];
+      const filePath = `completions/${Date.now()}_${file.name}`;
+      const statusSpan = document.getElementById(`photo-filename-${taskId}`);
+      
+      if (statusSpan) statusSpan.textContent = 'Uploading...';
+
+      const { data, error } = await supabaseClient
+        .storage
+        .from('task-photos')
+        .upload(filePath, file);
+
+      if (error) {
+        alert('Photo upload failed: ' + error.message);
+        if (statusSpan) statusSpan.textContent = 'Upload failed';
+        return null;
+      }
+
+      const { data: publicUrlData } = supabaseClient
+        .storage
+        .from('task-photos')
+        .getPublicUrl(filePath);
+
+      if (statusSpan) statusSpan.textContent = '✓ Photo attached';
+      fileInput.dataset.uploadedUrl = publicUrlData.publicUrl;
+      return publicUrlData.publicUrl;
+    };
+
+    // Toggle Task Completion with Photo URL & Initials Logging
     window.toggleTaskComplete = async function(taskId, isChecking) {
       if (isChecking) {
         const initialsInput = document.getElementById(`initials-${taskId}`);
         const initials = initialsInput ? initialsInput.value.trim() : '';
+        
+        const photoInput = document.getElementById(`photos-${taskId}`);
+        const photoUrl = photoInput ? (photoInput.dataset.uploadedUrl || null) : null;
 
         const { error } = await supabaseClient.from('task_completions').insert([{
           task_id: taskId,
           completed_date: currentSelectedDateISO,
-          initials: initials
+          initials: initials,
+          photo_url: photoUrl
         }]);
 
         if (error) alert('Error saving completion: ' + error.message);
@@ -742,6 +803,36 @@
       }
 
       selectDay(currentSelectedDay);
+    };
+
+    // CSV Export Function for Compliance Audits
+    window.exportCompletionsToCSV = async function() {
+      const { data, error } = await supabaseClient
+        .from('task_completions')
+        .select('*, tasks(title, category)');
+
+      if (error) return alert('Failed to fetch completion logs: ' + error.message);
+
+      if (!data || data.length === 0) {
+        return alert('No task completion records found to export.');
+      }
+
+      let csv = 'Completion ID,Task Title,Category,Completed Date,Initials,Photo URL,Timestamp\n';
+      data.forEach(row => {
+        const taskTitle = row.tasks?.title ? row.tasks.title.replace(/"/g, '""') : 'Deleted Task';
+        const category = row.tasks?.category ? row.tasks.category.replace(/"/g, '""') : 'N/A';
+        const initials = row.initials ? row.initials.replace(/"/g, '""') : 'N/A';
+        const photoUrl = row.photo_url || 'None';
+
+        csv += `"${row.id}","${taskTitle}","${category}","${row.completed_date}","${initials}","${photoUrl}","${row.created_at || ''}"\n`;
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.setAttribute('href', url);
+      a.setAttribute('download', `flipout-cleaning-audit-${new Date().toISOString().split('T')[0]}.csv`);
+      a.click();
     };
 
     // Back Office & Permissions Logic
@@ -1014,7 +1105,10 @@
 
     function applyUserPermissions(user) {
       document.getElementById('user-welcome-email').textContent = user.email;
-      const role = user.user_metadata?.role || (user.email.includes('admin') ? 'admin' : 'supervisor');
+      
+      const adminEmails = ['derrimutmanager@flipout.com.au'];
+      const isAdminEmail = adminEmails.includes(user.email.toLowerCase()) || user.email.toLowerCase().includes('admin');
+      const role = (user.user_metadata?.role === 'admin' || isAdminEmail) ? 'admin' : 'supervisor';
       currentUserRole = role;
 
       const roleBadge = document.getElementById('user-role-tag');

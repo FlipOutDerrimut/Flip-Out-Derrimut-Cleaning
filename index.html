@@ -66,13 +66,13 @@
       gap: 6px;
       overflow-x: auto;
       padding-bottom: 8px;
-      margin-bottom: 1.5rem;
+      margin-bottom: 1rem;
       border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     }
 
     .day-tab {
       flex: 1;
-      min-width: 70px;
+      min-width: 60px;
       padding: 0.6rem 0.4rem;
       background: #25123E;
       border: 1px solid rgba(255, 255, 255, 0.1);
@@ -290,13 +290,13 @@
     <div class="sub-title">Daily Operations Checklist</div>
 
     <div class="day-selector-container">
-      <button class="day-tab" data-day="monday">Mon</button>
-      <button class="day-tab" data-day="tuesday">Tue</button>
-      <button class="day-tab" data-day="wednesday">Wed</button>
-      <button class="day-tab" data-day="thursday">Thu</button>
-      <button class="day-tab" data-day="friday">Fri</button>
-      <button class="day-tab" data-day="saturday">Sat</button>
-      <button class="day-tab" data-day="sunday">Sun</button>
+      <button class="day-tab main-day-tab" data-day="monday">Mon</button>
+      <button class="day-tab main-day-tab" data-day="tuesday">Tue</button>
+      <button class="day-tab main-day-tab" data-day="wednesday">Wed</button>
+      <button class="day-tab main-day-tab" data-day="thursday">Thu</button>
+      <button class="day-tab main-day-tab" data-day="friday">Fri</button>
+      <button class="day-tab main-day-tab" data-day="saturday">Sat</button>
+      <button class="day-tab main-day-tab" data-day="sunday">Sun</button>
     </div>
 
     <div class="checklist-header">
@@ -387,7 +387,22 @@
       </div>
     </form>
 
-    <h3 style="margin-bottom: 1rem; font-size: 1.1rem;">Active Database Tasks</h3>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+      <h3 style="margin: 0; font-size: 1.1rem;">Active Database Tasks</h3>
+    </div>
+
+    <!-- BACK OFFICE DAY FILTER -->
+    <div class="day-selector-container">
+      <button class="day-tab admin-filter-tab active" data-filter="all">All</button>
+      <button class="day-tab admin-filter-tab" data-filter="monday">Mon</button>
+      <button class="day-tab admin-filter-tab" data-filter="tuesday">Tue</button>
+      <button class="day-tab admin-filter-tab" data-filter="wednesday">Wed</button>
+      <button class="day-tab admin-filter-tab" data-filter="thursday">Thu</button>
+      <button class="day-tab admin-filter-tab" data-filter="friday">Fri</button>
+      <button class="day-tab admin-filter-tab" data-filter="saturday">Sat</button>
+      <button class="day-tab admin-filter-tab" data-filter="sunday">Sun</button>
+    </div>
+
     <div id="admin-task-list">
       <p style="text-align: center; color: var(--text-muted);">Loading tasks...</p>
     </div>
@@ -407,6 +422,7 @@
     const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
     let currentSelectedDay = days[new Date().getDay()];
     let allLoadedTasks = [];
+    let activeAdminFilter = 'all';
 
     // DOM Elements
     const mainApp = document.getElementById('main-app');
@@ -414,7 +430,8 @@
     const backOfficeScreen = document.getElementById('back-office-screen');
     const checklistContainer = document.getElementById('checklist-container');
     const adminTaskList = document.getElementById('admin-task-list');
-    const dayTabs = document.querySelectorAll('.day-tab');
+    const mainDayTabs = document.querySelectorAll('.main-day-tab');
+    const adminFilterTabs = document.querySelectorAll('.admin-filter-tab');
 
     // 1. Initialise App
     async function initialiseApp() {
@@ -426,7 +443,7 @@
     async function selectDay(dayName) {
       currentSelectedDay = dayName;
       
-      dayTabs.forEach(tab => {
+      mainDayTabs.forEach(tab => {
         tab.classList.toggle('active', tab.dataset.day === dayName);
       });
 
@@ -479,13 +496,27 @@
       }
 
       allLoadedTasks = tasks;
+      renderAdminTaskList();
+    }
 
-      adminTaskList.innerHTML = tasks.map(task => `
+    function renderAdminTaskList() {
+      let filteredTasks = allLoadedTasks;
+
+      if (activeAdminFilter !== 'all') {
+        filteredTasks = allLoadedTasks.filter(task => (task.days || []).includes(activeAdminFilter));
+      }
+
+      if (filteredTasks.length === 0) {
+        adminTaskList.innerHTML = `<p style="text-align: center; color: var(--text-muted); padding: 1rem;">No tasks found for ${activeAdminFilter.toUpperCase()}.</p>`;
+        return;
+      }
+
+      adminTaskList.innerHTML = filteredTasks.map(task => `
         <div class="admin-task-item">
           <div style="flex-grow: 1; padding-right: 12px;">
             <strong>${task.title}</strong>
             <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">
-              Category: ${task.category} | Days: ${(task.days || []).map(d => d.substring(0,3)).join(', ')}
+              Category: ${task.category} | Days: ${(task.days || []).map(d => d.substring(0,3).toUpperCase()).join(', ')}
             </div>
           </div>
           <div class="admin-actions">
@@ -507,7 +538,6 @@
       document.getElementById('new-task-photo').checked = task.requires_photo;
       document.getElementById('new-task-initials').checked = task.requires_initials;
 
-      // Set active day checkboxes
       document.querySelectorAll('.day-check').forEach(cb => {
         cb.checked = (task.days || []).includes(cb.value);
       });
@@ -551,7 +581,6 @@
 
       let result;
       if (editingId) {
-        // UPDATE existing task
         result = await supabaseClient.from('tasks').update({
           title,
           category,
@@ -560,7 +589,6 @@
           days: selectedDays
         }).eq('id', editingId);
       } else {
-        // INSERT new task
         result = await supabaseClient.from('tasks').insert([{
           title,
           category,
@@ -641,8 +669,17 @@
     document.getElementById('back-to-app-btn-1').addEventListener('click', showMainApp);
     document.getElementById('back-to-app-btn-2').addEventListener('click', showMainApp);
 
-    dayTabs.forEach(tab => {
+    mainDayTabs.forEach(tab => {
       tab.addEventListener('click', () => selectDay(tab.dataset.day));
+    });
+
+    adminFilterTabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        adminFilterTabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        activeAdminFilter = tab.dataset.filter;
+        renderAdminTaskList();
+      });
     });
 
     initialiseApp();

@@ -3,12 +3,17 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Flip Out - Daily Checklists</title>
+  <title>Flip Out Derrimut - Daily Checklists</title>
 
   <!-- iPad Kiosk & PWA Meta Tags -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Flip Out Clean">
+
+  <!-- Google Fonts: Unbounded (Brand Primary Headline Font) & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <!-- Supabase JS Client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -16,25 +21,37 @@
   <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
   <style>
     :root {
+      /* Official Flip Out 2025 Brand Colors */
       --flipout-green: #99C63E;
+      --flipout-pink: #FF509F;
+      --flipout-purple: #8D2D91;
       --flipout-velvet: #0F041D;
-      --bg-card: #1A0B2E;
-      --bg-input: #0B0314;
+      --flipout-white: #FFFFFF;
+      --bg-card: #1E0C36;
+      --bg-card-alt: #281147;
+      --bg-input: #0A0314;
       --text-light: #FFFFFF;
-      --text-muted: #A0A0A0;
-      --danger: #FF5555;
+      --text-muted: #B8B0C8;
+      --danger: #FF4D4D;
       --warning: #FFB703;
     }
 
     * {
       box-sizing: border-box;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+
+    h1, h2, h3, .brand-title, .checklist-title, .day-tab {
+      font-family: 'Unbounded', system-ui, sans-serif;
     }
 
     body {
       margin: 0;
       padding: 1.5rem 1rem;
       background-color: var(--flipout-velvet);
+      background-image: 
+        radial-gradient(circle at 10% 20%, rgba(255, 80, 159, 0.15) 0%, transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(153, 198, 62, 0.15) 0%, transparent 40%);
       color: var(--text-light);
       display: flex;
       flex-direction: column;
@@ -44,37 +61,73 @@
 
     .container {
       width: 100%;
-      max-width: 720px;
+      max-width: 760px;
       padding: 2rem;
       background: var(--bg-card);
-      border-radius: 16px;
-      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
-      border: 1px solid rgba(153, 198, 62, 0.25);
+      border-radius: 20px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7), 0 0 20px rgba(255, 80, 159, 0.15);
+      border: 2px solid transparent;
+      border-image: linear-gradient(135deg, var(--flipout-green), var(--flipout-pink)) 1;
+      position: relative;
+      overflow: hidden;
     }
 
-    .brand-title {
-      color: var(--flipout-green);
+    /* Top Brand Hero Section */
+    .brand-header {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
       text-align: center;
-      margin: 0 0 0.25rem 0;
-      text-transform: uppercase;
-      letter-spacing: 1.5px;
-      font-size: 2rem;
+      margin-bottom: 1.5rem;
+      position: relative;
+    }
+
+    .brand-logo {
+      max-width: 240px;
+      height: auto;
+      margin-bottom: 0.5rem;
+      filter: drop-shadow(0 4px 12px rgba(0,0,0,0.5));
     }
 
     .sub-title {
       text-align: center;
-      color: var(--text-muted);
+      color: var(--flipout-pink);
+      font-weight: 700;
       font-size: 0.95rem;
-      margin-bottom: 1.5rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    /* Floating Mascots */
+    .mascot-hero-right {
+      position: absolute;
+      top: -10px;
+      right: -15px;
+      width: 110px;
+      height: auto;
+      pointer-events: none;
+      filter: drop-shadow(0 6px 12px rgba(0,0,0,0.4));
+      z-index: 2;
+    }
+
+    .mascot-corner-left {
+      position: absolute;
+      bottom: 10px;
+      left: -10px;
+      width: 95px;
+      height: auto;
+      pointer-events: none;
+      opacity: 0.9;
     }
 
     /* Progress Bar */
     .progress-wrapper {
       margin-bottom: 1.5rem;
       background: var(--bg-input);
-      border-radius: 12px;
-      padding: 1rem;
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      padding: 1.1rem;
+      border: 1px solid rgba(255, 80, 159, 0.25);
+      box-shadow: inset 0 2px 6px rgba(0,0,0,0.5);
     }
 
     .progress-header {
@@ -82,22 +135,25 @@
       justify-content: space-between;
       font-size: 0.85rem;
       font-weight: bold;
-      margin-bottom: 0.5rem;
+      margin-bottom: 0.6rem;
+      color: var(--flipout-green);
     }
 
     .progress-bar-bg {
       width: 100%;
-      height: 12px;
-      background: #25123E;
-      border-radius: 6px;
+      height: 14px;
+      background: #140726;
+      border-radius: 7px;
       overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.05);
     }
 
     .progress-bar-fill {
       height: 100%;
       width: 0%;
-      background: var(--flipout-green);
+      background: linear-gradient(90deg, var(--flipout-green), var(--flipout-pink));
       transition: width 0.4s ease;
+      box-shadow: 0 0 10px var(--flipout-pink);
     }
 
     /* Day Selector Navigation */
@@ -106,29 +162,32 @@
       gap: 6px;
       overflow-x: auto;
       padding-bottom: 8px;
-      margin-bottom: 1rem;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      margin-bottom: 1.25rem;
+      border-bottom: 2px solid rgba(255, 255, 255, 0.08);
     }
 
     .day-tab {
       flex: 1;
-      min-width: 60px;
-      padding: 0.6rem 0.4rem;
-      background: #25123E;
+      min-width: 62px;
+      padding: 0.7rem 0.4rem;
+      background: var(--bg-card-alt);
       border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 8px;
+      border-radius: 10px;
       color: var(--text-muted);
       text-align: center;
-      font-size: 0.85rem;
-      font-weight: 600;
+      font-size: 0.8rem;
+      font-weight: 700;
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition: all 0.25 ease;
+      text-transform: uppercase;
     }
 
     .day-tab.active {
-      background: var(--flipout-green);
-      color: var(--flipout-velvet);
-      border-color: var(--flipout-green);
+      background: linear-gradient(135deg, var(--flipout-pink), #D62B78);
+      color: var(--flipout-white);
+      border-color: var(--flipout-pink);
+      box-shadow: 0 4px 12px rgba(255, 80, 159, 0.4);
+      transform: translateY(-2px);
     }
 
     /* Checklist Cards */
@@ -140,26 +199,33 @@
     }
 
     .checklist-title {
-      font-size: 1.25rem;
-      font-weight: bold;
-      text-transform: capitalize;
+      font-size: 1.2rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      color: var(--flipout-green);
+      letter-spacing: 0.5px;
     }
 
     .task-card {
-      background: var(--bg-input);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 10px;
-      padding: 1rem;
+      background: var(--bg-card-alt);
+      border: 1px solid rgba(153, 198, 62, 0.2);
+      border-radius: 12px;
+      padding: 1.1rem;
       margin-bottom: 0.85rem;
       display: flex;
       flex-direction: column;
       gap: 0.75rem;
-      transition: opacity 0.3s ease;
+      transition: all 0.3s ease;
+    }
+
+    .task-card:hover {
+      border-color: rgba(255, 80, 159, 0.4);
     }
 
     .task-card.completed {
-      opacity: 0.6;
+      opacity: 0.55;
       border-color: rgba(153, 198, 62, 0.3);
+      background: var(--bg-input);
     }
 
     .task-main {
@@ -169,17 +235,18 @@
     }
 
     .task-checkbox {
-      width: 22px;
-      height: 22px;
+      width: 24px;
+      height: 24px;
       margin-top: 2px;
-      accent-color: var(--flipout-green);
+      accent-color: var(--flipout-pink);
       cursor: pointer;
     }
 
     .task-label {
-      font-size: 1rem;
+      font-size: 0.98rem;
       flex-grow: 1;
       line-height: 1.4;
+      font-weight: 500;
     }
 
     .task-card.completed .task-label {
@@ -191,61 +258,71 @@
       display: flex;
       gap: 10px;
       align-items: center;
-      padding-left: 34px;
+      padding-left: 36px;
       flex-wrap: wrap;
     }
 
     .initials-input {
       width: 100px;
-      padding: 0.4rem 0.6rem;
-      border-radius: 6px;
-      border: 1px solid #443355;
-      background: #18092B;
+      padding: 0.45rem 0.6rem;
+      border-radius: 8px;
+      border: 1px solid var(--flipout-pink);
+      background: var(--bg-input);
       color: #fff;
       font-size: 0.85rem;
       text-transform: uppercase;
+      font-weight: 600;
     }
 
     .photo-upload-btn {
-      background: #2E174D;
-      border: 1px solid var(--flipout-green);
+      background: rgba(255, 80, 159, 0.15);
+      border: 1px solid var(--flipout-pink);
       color: #fff;
-      padding: 0.4rem 0.75rem;
-      border-radius: 6px;
+      padding: 0.45rem 0.8rem;
+      border-radius: 8px;
       font-size: 0.8rem;
+      font-weight: 600;
       cursor: pointer;
       display: flex;
       align-items: center;
       gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .photo-upload-btn:hover {
+      background: var(--flipout-pink);
+      color: #fff;
     }
 
     .badge-temp {
-      background: var(--warning);
-      color: #000;
+      background: var(--flipout-pink);
+      color: #fff;
       font-size: 0.7rem;
-      font-weight: bold;
-      padding: 2px 6px;
-      border-radius: 4px;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: 6px;
       text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
 
     /* Back Office & Approval Window Styles */
     .approval-window {
-      background: #2A1704;
+      background: #2D1402;
       border: 2px solid var(--warning);
-      border-radius: 12px;
+      border-radius: 14px;
       padding: 1.25rem;
       margin-bottom: 2rem;
     }
 
     .admin-task-item {
-      background: #25123E;
-      border-radius: 8px;
+      background: var(--bg-card-alt);
+      border-radius: 10px;
       padding: 1rem;
       margin-bottom: 0.75rem;
       display: flex;
       justify-content: space-between;
       align-items: center;
+      border: 1px solid rgba(255,255,255,0.05);
     }
 
     .admin-actions {
@@ -262,16 +339,22 @@
       margin-bottom: 0.4rem;
       font-size: 0.85rem;
       color: var(--text-muted);
+      font-weight: 600;
     }
 
     input, select {
       width: 100%;
       padding: 0.75rem;
       border-radius: 8px;
-      border: 1px solid #332244;
+      border: 1px solid rgba(255, 80, 159, 0.3);
       background: var(--bg-input);
       color: #fff;
       font-size: 0.95rem;
+    }
+
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--flipout-green);
     }
 
     .days-grid {
@@ -286,33 +369,49 @@
       flex-direction: column;
       align-items: center;
       font-size: 0.75rem;
-      background: #18092B;
-      padding: 6px 2px;
+      background: var(--bg-input);
+      padding: 8px 2px;
       border-radius: 6px;
-      border: 1px solid #332244;
+      border: 1px solid rgba(255,255,255,0.1);
       cursor: pointer;
+      font-weight: 600;
     }
 
     .btn-primary {
       width: 100%;
-      padding: 0.85rem;
+      padding: 0.9rem;
       border: none;
-      border-radius: 8px;
-      background-color: var(--flipout-green);
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--flipout-green), #7BA828);
       color: var(--flipout-velvet);
-      font-weight: bold;
-      font-size: 1rem;
+      font-family: 'Unbounded', sans-serif;
+      font-weight: 800;
+      font-size: 0.95rem;
       cursor: pointer;
+      text-transform: uppercase;
+      box-shadow: 0 4px 12px rgba(153, 198, 62, 0.3);
+      transition: all 0.2s ease;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(153, 198, 62, 0.4);
     }
 
     .btn-secondary {
-      background: #2E174D;
-      border: 1px solid var(--flipout-green);
+      background: rgba(255, 80, 159, 0.15);
+      border: 1px solid var(--flipout-pink);
       color: #fff;
-      padding: 0.4rem 0.6rem;
-      border-radius: 6px;
+      padding: 0.5rem 0.8rem;
+      border-radius: 8px;
       cursor: pointer;
       font-size: 0.8rem;
+      font-weight: 600;
+      transition: all 0.2s ease;
+    }
+
+    .btn-secondary:hover {
+      background: var(--flipout-pink);
     }
 
     .btn-success {
@@ -375,9 +474,10 @@
 
     .role-badge {
       font-size: 0.75rem;
-      background: #332244;
-      color: var(--flipout-green);
-      padding: 2px 8px;
+      background: rgba(255, 80, 159, 0.2);
+      border: 1px solid var(--flipout-pink);
+      color: var(--flipout-pink);
+      padding: 3px 10px;
       border-radius: 12px;
       text-transform: uppercase;
       font-weight: bold;
@@ -386,10 +486,12 @@
     .section-divider {
       margin: 1.5rem 0 1rem 0;
       padding-top: 1rem;
-      border-top: 1px dashed rgba(255, 255, 255, 0.15);
-      font-size: 0.95rem;
-      color: var(--flipout-green);
+      border-top: 2px dashed rgba(255, 80, 159, 0.3);
+      font-size: 0.9rem;
+      color: var(--flipout-pink);
       font-weight: bold;
+      text-transform: uppercase;
+      font-family: 'Unbounded', sans-serif;
     }
   </style>
 </head>
@@ -397,8 +499,12 @@
 
   <!-- 1. STAFF CHECKLIST VIEW (iPad Default) -->
   <div id="main-app" class="container">
-    <h1 class="brand-title">Flip Out</h1>
-    <div class="sub-title">Daily Operations Checklist</div>
+    <!-- Header with Derrimut Logo and Jet & Max Mascot -->
+    <div class="brand-header">
+      <img src="FO Derrimut-01.png" alt="Flip Out Derrimut Logo" class="brand-logo">
+      <div class="sub-title">Daily Operations Checklist</div>
+      <img src="14.png" alt="Jet and Max Ninjas" class="mascot-hero-right">
+    </div>
 
     <!-- Live Progress Bar -->
     <div class="progress-wrapper">
@@ -423,6 +529,7 @@
 
     <div class="checklist-header">
       <div id="active-day-title" class="checklist-title">Today's Tasks</div>
+      <img src="Dash pose 3.png" alt="Dash Ninja" style="height: 45px; width: auto;">
     </div>
 
     <!-- Active Pending Tasks -->
@@ -431,9 +538,10 @@
     </div>
 
     <!-- Completed Tasks Bucket -->
-    <div id="completed-section" class="hidden">
+    <div id="completed-section" class="hidden" style="position: relative;">
       <div class="section-divider">✓ Completed Tasks (Click to Uncheck)</div>
       <div id="completed-tasks-container"></div>
+      <img src="Roo pose 4.png" alt="Roo Ninja" class="mascot-corner-left">
     </div>
 
     <div class="footer" style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
@@ -446,8 +554,10 @@
 
   <!-- 2. ADMIN LOGIN SCREEN -->
   <div id="admin-login-screen" class="container hidden">
-    <h1 class="brand-title">Back Office</h1>
-    <div class="sub-title">Staff & Supervisor Login</div>
+    <div class="brand-header">
+      <img src="FO Derrimut-01.png" alt="Flip Out Derrimut Logo" class="brand-logo" style="max-width: 180px;">
+      <div class="sub-title">Staff & Supervisor Login</div>
+    </div>
 
     <form id="admin-login-form">
       <div class="form-group">
@@ -467,12 +577,15 @@
     </div>
   </div>
 
-  <!-- 3. BACK OFFICE TASK MANAGER (Logged In) -->
+  <!-- 3. BACK OFFICE TASK MANAGER (Logged In View) -->
   <div id="back-office-screen" class="container hidden">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-      <div>
-        <h1 class="brand-title" style="margin:0; text-align: left;">Back Office</h1>
-        <div class="sub-title" id="user-welcome-email" style="margin-bottom:0; text-align: left;">Logged in</div>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 1rem;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <img src="Ref pose 2.png" alt="Ref Ninja" style="height: 65px; width: auto;">
+        <div>
+          <h2 style="margin:0; text-align: left; font-size: 1.3rem; color: var(--flipout-green);">Back Office</h2>
+          <div class="sub-title" id="user-welcome-email" style="margin-bottom:0; text-align: left; font-size: 0.8rem;">Logged in</div>
+        </div>
       </div>
       <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
         <span id="user-role-tag" class="role-badge">Supervisor</span>
@@ -491,14 +604,14 @@
 
     <!-- DEDICATED ADMIN APPROVAL WINDOW (Visible ONLY to Admin) -->
     <div id="approval-queue-section" class="approval-window hidden">
-      <h3 style="margin-top: 0; margin-bottom: 0.5rem; font-size: 1.15rem; color: var(--warning);">📥 Pending Job Requests (Admin Approval)</h3>
+      <h3 style="margin-top: 0; margin-bottom: 0.5rem; font-size: 1.1rem; color: var(--warning);">📥 Pending Job Requests (Admin Approval)</h3>
       <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Review supervisor job submissions below. Click "Approve" to publish or "Reject" to discard.</p>
       <div id="approval-task-list"></div>
     </div>
 
     <!-- CREATE SUPERVISOR ACCOUNT FORM (Admin Only) -->
-    <form id="create-user-form" class="admin-only hidden" style="margin-bottom: 2rem; background: #25123E; padding: 1.25rem; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1);">
-      <h3 style="margin-top: 0; color: var(--flipout-green); font-size: 1.1rem;">👤 Register New Supervisor Account</h3>
+    <form id="create-user-form" class="admin-only hidden" style="margin-bottom: 2rem; background: var(--bg-card-alt); padding: 1.25rem; border-radius: 12px; border: 1px solid rgba(255,80,159,0.3);">
+      <h3 style="margin-top: 0; color: var(--flipout-pink); font-size: 1rem;">👤 Register New Supervisor Account</h3>
       <div style="display: flex; gap: 10px; flex-wrap: wrap;">
         <div class="form-group" style="flex: 1; min-width: 200px;">
           <label for="new-user-email">Supervisor Email</label>
@@ -514,7 +627,7 @@
     </form>
 
     <!-- Task Form (Accessible to Admin & Supervisors) -->
-    <form id="task-form" style="margin-bottom: 2rem; background: var(--bg-input); padding: 1.25rem; border-radius: 10px;">
+    <form id="task-form" style="margin-bottom: 2rem; background: var(--bg-input); padding: 1.25rem; border-radius: 12px; border: 1px solid rgba(153,198,62,0.2);">
       <input type="hidden" id="editing-task-id" value="" />
       <h3 id="form-heading" style="margin-top: 0; color: var(--flipout-green); font-size: 1.1rem;">Add Job</h3>
       
@@ -579,7 +692,7 @@
 
     <!-- Active Task Management Filter -->
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-      <h3 style="margin: 0; font-size: 1.1rem;">Active Tasks</h3>
+      <h3 style="margin: 0; font-size: 1.1rem; color: var(--flipout-green);">Active Tasks</h3>
     </div>
 
     <div class="day-selector-container">
@@ -613,7 +726,7 @@
     const EMAILJS_PUBLIC_KEY = 'kxng6zTg7LBwLYGBU'; 
     const EMAILJS_SERVICE_ID = 'service_0alkyrv';
     const EMAILJS_TEMPLATE_ID = 'YOUR_TEMPLATE_ID';
-    const EMAILJS_EOD_TEMPLATE_ID = 'template_ehvz1nm'; // Replace with EmailJS EOD Template ID
+    const EMAILJS_EOD_TEMPLATE_ID = 'template_ehvz1nm';
     
     if (EMAILJS_PUBLIC_KEY !== 'YOUR_EMAILJS_PUBLIC_KEY') {
       emailjs.init(EMAILJS_PUBLIC_KEY);
@@ -624,7 +737,7 @@
     let currentSelectedDateISO = new Date().toISOString().split('T')[0];
     let allLoadedTasks = [];
     let activeAdminFilter = 'all';
-    let currentUserRole = 'supervisor'; // Default fallback role
+    let currentUserRole = 'supervisor';
 
     // DOM Elements
     const mainApp = document.getElementById('main-app');
@@ -712,7 +825,7 @@
         }
       });
 
-      pendingTasksContainer.innerHTML = pendingList.length > 0 ? pendingList.join('') : `<p style="text-align: center; color: var(--text-muted); padding: 1rem;">All tasks for this day are completed! 🎉</p>`;
+      pendingTasksContainer.innerHTML = pendingList.length > 0 ? pendingList.join('') : `<p style="text-align: center; color: var(--flipout-green); padding: 1.5rem; font-weight: bold;">All tasks for this day are completed! 🎉</p>`;
       completedTasksContainer.innerHTML = completedList.join('');
 
       if (completedList.length > 0) {
@@ -742,7 +855,7 @@
                 📷 Photos (Up to ${maxPhotos})
                 <input type="file" id="photos-${task.id}" accept="image/*" capture="camera" multiple ${isDone ? 'disabled' : ''} style="display:none;" onchange="handleTaskPhotoSelect(this, '${task.id}')">
               </label>
-              <span id="photo-filename-${task.id}" style="font-size:0.75rem; color: var(--flipout-green);"></span>
+              <span id="photo-filename-${task.id}" style="font-size:0.75rem; color: var(--flipout-green); font-weight: 600;"></span>
             ` : ''}
           </div>
         </div>
@@ -1067,8 +1180,6 @@
       const is_temporary = document.getElementById('new-task-temporary').checked;
       const selectedDays = Array.from(document.querySelectorAll('.day-check:checked')).map(cb => cb.value);
 
-      // If user is admin or job is temporary -> Approved immediately.
-      // If user is supervisor and job is permanent -> Queued for Admin Approval.
       const is_approved = (currentUserRole === 'admin') || is_temporary;
 
       let result;
@@ -1110,7 +1221,7 @@
       }
     }
 
-    // Register Supervisor User Account with 'supervisor' role in metadata
+    // Register Supervisor User Account
     document.getElementById('create-user-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const email = document.getElementById('new-user-email').value;
@@ -1124,7 +1235,7 @@
         email: email,
         password: password,
         options: {
-          data: { role: 'supervisor' } // Tag account with supervisor role
+          data: { role: 'supervisor' }
         }
       });
 

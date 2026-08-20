@@ -436,7 +436,10 @@
       <div id="completed-tasks-container"></div>
     </div>
 
-    <div class="footer">
+    <div class="footer" style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+      <button id="send-eod-main-btn" onclick="sendEODSummaryEmail()" class="btn-secondary" style="font-size: 0.8rem;">
+        ✉️ Dispatch EOD Email
+      </button>
       <button id="show-admin-login-btn" class="admin-link">Back Office Access</button>
     </div>
   </div>
@@ -473,10 +476,16 @@
       </div>
       <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
         <span id="user-role-tag" class="role-badge">Supervisor</span>
-        <!-- CSV Export Button (Admin Only) -->
-        <button id="export-csv-btn" onclick="exportCompletionsToCSV()" class="btn-success admin-only hidden">
-          📥 Export Audit Log (CSV)
-        </button>
+        <div style="display: flex; gap: 6px;">
+          <!-- EOD Trigger Button (Back Office) -->
+          <button id="send-eod-btn" onclick="sendEODSummaryEmail()" class="btn-secondary">
+            ✉️ EOD Report
+          </button>
+          <!-- CSV Export Button (Admin Only) -->
+          <button id="export-csv-btn" onclick="exportCompletionsToCSV()" class="btn-success admin-only hidden">
+            📥 Export CSV
+          </button>
+        </div>
       </div>
     </div>
 
@@ -600,11 +609,13 @@
     const SUPABASE_ANON_KEY = 'sb_publishable_PxJuEvkUbVmqNlcq-E2sPg_VBn5vI3F';
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // EmailJS Configuration for Admin Notifications
+    // EmailJS Configuration for Admin Notifications & EOD Reports
     const EMAILJS_PUBLIC_KEY = 'kxng6zTg7LBwLYGBU'; 
     const EMAILJS_SERVICE_ID = 'service_0alkyrv';
     const EMAILJS_TEMPLATE_ID = 'YOUR_TEMPLATE_ID';
-    if (EMAILJS_PUBLIC_KEY !== 'template_24a3z1i') {
+    const EMAILJS_EOD_TEMPLATE_ID = 'YOUR_EOD_TEMPLATE_ID'; // Replace with EmailJS EOD Template ID
+    
+    if (EMAILJS_PUBLIC_KEY !== 'YOUR_EMAILJS_PUBLIC_KEY') {
       emailjs.init(EMAILJS_PUBLIC_KEY);
     }
 
@@ -803,6 +814,67 @@
       }
 
       selectDay(currentSelectedDay);
+    };
+
+    // Send EOD Summary Email
+    window.sendEODSummaryEmail = async function() {
+      if (!confirm(`Send the End of Day summary report for ${currentSelectedDay.toUpperCase()} (${currentSelectedDateISO})?`)) return;
+
+      try {
+        const { data: completions } = await supabaseClient
+          .from('task_completions')
+          .select('task_id, initials, photo_url')
+          .eq('completed_date', currentSelectedDateISO);
+
+        const { data: tasks, error } = await supabaseClient
+          .from('tasks')
+          .select('*')
+          .eq('is_approved', true)
+          .or(`days.cs.{${currentSelectedDay}},and(is_temporary.eq.true,created_for_date.eq.${currentSelectedDateISO})`)
+          .order('sort_order', { ascending: true });
+
+        if (error) {
+          alert('Failed to retrieve EOD task status: ' + error.message);
+          return;
+        }
+
+        const completionMap = new Map();
+        (completions || []).forEach(c => completionMap.set(c.task_id, c));
+
+        const completedList = [];
+        const pendingList = [];
+
+        (tasks || []).forEach(t => {
+          if (completionMap.has(t.id)) {
+            const comp = completionMap.get(t.id);
+            let detail = t.title;
+            if (comp.initials) detail += ` [Initials: ${comp.initials}]`;
+            if (comp.photo_url) detail += ` [Photo Attached]`;
+            completedList.push(detail);
+          } else {
+            pendingList.push(t.title);
+          }
+        });
+
+        const totalTasks = tasks.length;
+        const totalCompleted = completedList.length;
+        const completionRate = totalTasks > 0 ? Math.round((totalCompleted / totalTasks) * 100) : 0;
+
+        const templateParams = {
+          report_date: currentSelectedDateISO,
+          day_name: currentSelectedDay.toUpperCase(),
+          completion_rate: `${completionRate}% (${totalCompleted}/${totalTasks})`,
+          completed_tasks: completedList.length > 0 ? completedList.map(item => `• ${item}`).join('\n') : 'None',
+          pending_tasks: pendingList.length > 0 ? pendingList.map(item => `• ${item}`).join('\n') : 'None'
+        };
+
+        const activeTemplate = EMAILJS_EOD_TEMPLATE_ID !== 'YOUR_EOD_TEMPLATE_ID' ? EMAILJS_EOD_TEMPLATE_ID : EMAILJS_TEMPLATE_ID;
+
+        await emailjs.send(EMAILJS_SERVICE_ID, activeTemplate, templateParams);
+        alert(`✓ EOD Summary Email dispatched for ${currentSelectedDateISO}!`);
+      } catch (err) {
+        alert('Failed to send EOD Email: ' + (err.text || err.message || err));
+      }
     };
 
     // CSV Export Function for Compliance Audits

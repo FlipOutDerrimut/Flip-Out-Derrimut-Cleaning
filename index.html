@@ -900,23 +900,57 @@
       return publicUrlData.publicUrl;
     };
 
-    // Toggle Task Completion with Photo URL & Initials Logging
+    // Helper validation logic integrated into Vanilla JS execution
+    function isTaskValid(taskId) {
+      const initialsInput = document.getElementById(`initials-${taskId}`);
+      const initials = initialsInput ? initialsInput.value.trim() : '';
+      const photoInput = document.getElementById(`photos-${taskId}`);
+      const photoUrl = photoInput ? (photoInput.dataset.uploadedUrl || null) : null;
+
+      const hasInitials = initialsInput ? initials.length > 0 : true;
+      const hasPhotos = photoInput ? Boolean(photoUrl) : true;
+
+      return {
+        isValid: hasInitials && hasPhotos,
+        missingInitials: initialsInput && !hasInitials,
+        missingPhoto: photoInput && !hasPhotos,
+        initials: initials,
+        photoUrl: photoUrl
+      };
+    }
+
+    // Toggle Task Completion with Strict Validation Checks
     window.toggleTaskComplete = async function(taskId, isChecking) {
+      const checkbox = document.getElementById(`task-${taskId}`);
+
       if (isChecking) {
-        const initialsInput = document.getElementById(`initials-${taskId}`);
-        const initials = initialsInput ? initialsInput.value.trim() : '';
-        
-        const photoInput = document.getElementById(`photos-${taskId}`);
-        const photoUrl = photoInput ? (photoInput.dataset.uploadedUrl || null) : null;
+        const validation = isTaskValid(taskId);
+
+        if (validation.missingInitials) {
+          alert('⚠️ Mandatory: Please enter your initials before completing this task.');
+          if (checkbox) checkbox.checked = false;
+          const initialsInput = document.getElementById(`initials-${taskId}`);
+          if (initialsInput) initialsInput.focus();
+          return;
+        }
+
+        if (validation.missingPhoto) {
+          alert('⚠️ Mandatory: Please upload the required photo(s) before completing this task.');
+          if (checkbox) checkbox.checked = false;
+          return;
+        }
 
         const { error } = await supabaseClient.from('task_completions').insert([{
           task_id: taskId,
           completed_date: currentSelectedDateISO,
-          initials: initials,
-          photo_url: photoUrl
+          initials: validation.initials,
+          photo_url: validation.photoUrl
         }]);
 
-        if (error) alert('Error saving completion: ' + error.message);
+        if (error) {
+          alert('Error saving completion: ' + error.message);
+          if (checkbox) checkbox.checked = false;
+        }
       } else {
         const { error } = await supabaseClient.from('task_completions')
           .delete()

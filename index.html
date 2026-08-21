@@ -19,9 +19,12 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- EmailJS Client for Admin Notifications -->
   <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+  <!-- Canvas Confetti CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
   <style>
     :root {
-      /* Official Flip Out 2025 Brand Colors */
+      /* Official Flip Out 2025 Brand Colours */
       --flipout-green: #99C63E;
       --flipout-pink: #FF509F;
       --flipout-purple: #8D2D91;
@@ -178,7 +181,7 @@
       font-size: 0.8rem;
       font-weight: 700;
       cursor: pointer;
-      transition: all 0.25 ease;
+      transition: all 0.25s ease;
       text-transform: uppercase;
     }
 
@@ -303,6 +306,64 @@
       border-radius: 6px;
       text-transform: uppercase;
       letter-spacing: 0.5px;
+    }
+
+    /* Reward Modal Overlay & Animations */
+    .reward-modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(15, 4, 29, 0.85);
+      backdrop-filter: blur(8px);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+      animation: fadeIn 0.3s ease-out;
+    }
+
+    .reward-modal-card {
+      background: var(--bg-card);
+      border: 3px solid var(--flipout-pink);
+      border-radius: 24px;
+      padding: 2.5rem 2rem;
+      text-align: center;
+      max-width: 420px;
+      width: 90%;
+      box-shadow: 0 0 30px rgba(255, 80, 159, 0.4), 0 0 15px rgba(153, 198, 62, 0.3);
+      animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .reward-icon {
+      font-size: 3.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .reward-title {
+      font-size: 1.4rem;
+      color: var(--flipout-green);
+      margin: 0 0 0.75rem 0;
+      letter-spacing: 1px;
+    }
+
+    .reward-text {
+      font-size: 1.05rem;
+      color: #FFFFFF;
+      line-height: 1.5;
+      margin-bottom: 1.5rem;
+      font-weight: 500;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes popIn {
+      from { transform: scale(0.7); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
     }
 
     /* Back Office & Approval Window Styles */
@@ -716,6 +777,16 @@
     </div>
   </div>
 
+  <!-- 4. MOTIVATIONAL REWARD MODAL (Goal 1 Pop-up) -->
+  <div id="reward-modal" class="reward-modal-overlay hidden">
+    <div class="reward-modal-card">
+      <div class="reward-icon">🎉</div>
+      <h3 class="reward-title">FLIP-TASTIC WORK!</h3>
+      <p id="reward-message" class="reward-text"></p>
+      <button onclick="closeRewardModal()" class="btn-primary">Keep Crushing It!</button>
+    </div>
+  </div>
+
   <script>
     // Initialise Supabase Client
     const SUPABASE_URL = 'https://rtgmpmmcplxwezsleclj.supabase.co';
@@ -751,6 +822,67 @@
     const approvalQueueSection = document.getElementById('approval-queue-section');
     const mainDayTabs = document.querySelectorAll('.main-day-tab');
     const adminFilterTabs = document.querySelectorAll('.admin-filter-tab');
+
+    // Dynamic 10,000+ Combination Motivational Message Engine (Goal 1)
+    const messageComponents = {
+      openers: [
+        "Legendary work!", "Flip-tastic job!", "Unreal effort!", "Boom!", "Sensational effort!",
+        "Smashing work!", "Top-tier work!", "High-flyer!", "Absolute legend!", "Top stuff!",
+        "Outstanding focus!", "Crushing it!", "Pure excellence!", "Standard-setter!", "Spotless work!"
+      ],
+      actions: [
+        "You've aced this task,", "You've made this area look brand new,", "You smashed through this check,",
+        "Your attention to detail is spot on,", "You've elevated our venue standards,", "That was executed brilliantly,",
+        "You're keeping the park sparkling,", "Awesome focus on this area,", "You're setting the benchmark,",
+        "You took care of business,"
+      ],
+      impacts: [
+        "keeping our jumpers safe!", "making Flip Out Derrimut look elite!", "setting the standard for the whole team!",
+        "making the arena look unreal!", "keeping safety standards soaring!", "making the guest experience epic!",
+        "helping the venue smash today's goals!", "keeping the entire park spotless!", "showing everyone how it's done!",
+        "keeping the arena energy high!"
+      ],
+      closers: [
+        "Keep the momentum going! 🚀", "Give yourself a high five! 🙌", "Onto the next one! 💥",
+        "Keep soaring high! ⭐", "The team appreciates you! 🌟", "Legend status unlocked! 🏆",
+        "Keep crushing it! 💪", "Flip Out proud! 🟢", "Keep flipping awesome! 🎉", "Stay unstoppable! 🔥"
+      ]
+    };
+
+    function getRandomElement(array) {
+      return array[Math.floor(Math.random() * array.length)];
+    }
+
+    function generateMotivationalMessage() {
+      const opener = getRandomElement(messageComponents.openers);
+      const action = getRandomElement(messageComponents.actions);
+      const impact = getRandomElement(messageComponents.impacts);
+      const closer = getRandomElement(messageComponents.closers);
+
+      return `${opener} ${action} ${impact} ${closer}`;
+    }
+
+    function triggerRewardEffect() {
+      // 1. Launch Flip Out Branded Confetti Burst
+      if (typeof confetti === 'function') {
+        confetti({
+          particleCount: 120,
+          spread: 80,
+          origin: { y: 0.6 },
+          colors: ['#99C63E', '#FF509F', '#8D2D91', '#FFFFFF']
+        });
+      }
+
+      // 2. Inject Dynamic Motivational Message
+      document.getElementById('reward-message').textContent = generateMotivationalMessage();
+
+      // 3. Display Modal
+      document.getElementById('reward-modal').classList.remove('hidden');
+    }
+
+    function closeRewardModal() {
+      document.getElementById('reward-modal').classList.add('hidden');
+    }
 
     function getDateForDayOfWeek(dayName) {
       const dayMap = { 'sunday': 0, 'monday': 1, 'tuesday': 2, 'wednesday': 3, 'thursday': 4, 'friday': 5, 'saturday': 6 };
@@ -919,7 +1051,7 @@
       };
     }
 
-    // Toggle Task Completion with Strict Validation Checks
+    // Toggle Task Completion with Strict Validation Checks & Reward Trigger
     window.toggleTaskComplete = async function(taskId, isChecking) {
       const checkbox = document.getElementById(`task-${taskId}`);
 
@@ -950,6 +1082,8 @@
         if (error) {
           alert('Error saving completion: ' + error.message);
           if (checkbox) checkbox.checked = false;
+        } else {
+          triggerRewardEffect(); // Triggers Confetti & Dynamic Motivational Message
         }
       } else {
         const { error } = await supabaseClient.from('task_completions')
@@ -1358,7 +1492,7 @@
         showBackOffice();
       } else {
         mainApp.classList.add('hidden');
-        adminLoginScreen.classList.remove('hidden');
+        adminLoginScreen.remove('hidden');
       }
     });
 
@@ -1382,3 +1516,4 @@
   </script>
 </body>
 </html>
+

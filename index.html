@@ -15,13 +15,16 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-  <!-- Supabase & EmailJS & Confetti Clients -->
+  <!-- Supabase JS Client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- EmailJS Client for Admin Notifications -->
   <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+  <!-- Canvas Confetti CDN -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
   <style>
     :root {
+      /* Official Flip Out 2025 Brand Colours */
       --flipout-green: #99C63E;
       --flipout-pink: #FF509F;
       --flipout-purple: #8D2D91;
@@ -70,11 +73,6 @@
       border-image: linear-gradient(135deg, var(--flipout-green), var(--flipout-pink)) 1;
       position: relative;
       overflow: hidden;
-    }
-
-    /* Prevent container jitter by locking min-height */
-    #pending-tasks-container, #completed-tasks-container {
-      min-height: 80px;
     }
 
     .brand-header {
@@ -572,13 +570,13 @@
     </div>
 
     <div class="day-selector-container">
-      <button type="button" class="day-tab main-day-tab" data-day="monday">Mon</button>
-      <button type="button" class="day-tab main-day-tab" data-day="tuesday">Tue</button>
-      <button type="button" class="day-tab main-day-tab" data-day="wednesday">Wed</button>
-      <button type="button" class="day-tab main-day-tab" data-day="thursday">Thu</button>
-      <button type="button" class="day-tab main-day-tab" data-day="friday">Fri</button>
-      <button type="button" class="day-tab main-day-tab" data-day="saturday">Sat</button>
-      <button type="button" class="day-tab main-day-tab" data-day="sunday">Sun</button>
+      <button class="day-tab main-day-tab" data-day="monday">Mon</button>
+      <button class="day-tab main-day-tab" data-day="tuesday">Tue</button>
+      <button class="day-tab main-day-tab" data-day="wednesday">Wed</button>
+      <button class="day-tab main-day-tab" data-day="thursday">Thu</button>
+      <button class="day-tab main-day-tab" data-day="friday">Fri</button>
+      <button class="day-tab main-day-tab" data-day="saturday">Sat</button>
+      <button class="day-tab main-day-tab" data-day="sunday">Sun</button>
     </div>
 
     <div class="checklist-header">
@@ -586,12 +584,10 @@
       <img src="Dash pose 3.png" alt="Dash Ninja" style="height: 45px; width: auto;">
     </div>
 
-    <!-- Active Tasks Container -->
     <div id="pending-tasks-container">
       <p style="text-align: center; color: var(--text-muted);">Loading tasks from database...</p>
     </div>
 
-    <!-- Completed Tasks Container -->
     <div id="completed-section" class="hidden" style="position: relative;">
       <div class="section-divider">✓ Completed Tasks (Click to Uncheck)</div>
       <div id="completed-tasks-container"></div>
@@ -599,10 +595,10 @@
     </div>
 
     <div class="footer" style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
-      <button type="button" id="send-eod-main-btn" onclick="sendEODSummaryEmail()" class="btn-secondary" style="font-size: 0.8rem;">
+      <button id="send-eod-main-btn" onclick="sendEODSummaryEmail(false)" class="btn-secondary" style="font-size: 0.8rem;">
         ✉️ Dispatch EOD Email
       </button>
-      <button type="button" id="show-admin-login-btn" class="admin-link">Back Office Access</button>
+      <button id="show-admin-login-btn" class="admin-link">Back Office Access</button>
     </div>
   </div>
 
@@ -627,7 +623,7 @@
     </form>
 
     <div class="footer">
-      <button type="button" id="back-to-app-btn-1" class="admin-link">← Return to Checklist Portal</button>
+      <button id="back-to-app-btn-1" class="admin-link">← Return to Checklist Portal</button>
     </div>
   </div>
 
@@ -644,24 +640,22 @@
       <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
         <span id="user-role-tag" class="role-badge">Supervisor</span>
         <div style="display: flex; gap: 6px;">
-          <button type="button" id="send-eod-btn" onclick="sendEODSummaryEmail()" class="btn-secondary">
+          <button id="send-eod-btn" onclick="sendEODSummaryEmail(false)" class="btn-secondary">
             ✉️ EOD Report
           </button>
-          <button type="button" id="export-csv-btn" onclick="exportCompletionsToCSV()" class="btn-success admin-only hidden">
+          <button id="export-csv-btn" onclick="exportCompletionsToCSV()" class="btn-success admin-only hidden">
             📥 Export CSV
           </button>
         </div>
       </div>
     </div>
 
-    <!-- DEDICATED ADMIN APPROVAL WINDOW -->
     <div id="approval-queue-section" class="approval-window hidden">
       <h3 style="margin-top: 0; margin-bottom: 0.5rem; font-size: 1.1rem; color: var(--warning);">📥 Pending Job Requests (Admin Approval)</h3>
       <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Review supervisor job submissions below. Click "Approve" to publish or "Reject" to discard.</p>
       <div id="approval-task-list"></div>
     </div>
 
-    <!-- CREATE SUPERVISOR ACCOUNT FORM -->
     <form id="create-user-form" class="admin-only hidden" style="margin-bottom: 2rem; background: var(--bg-card-alt); padding: 1.25rem; border-radius: 12px; border: 1px solid rgba(255,80,159,0.3);">
       <h3 style="margin-top: 0; color: var(--flipout-pink); font-size: 1rem;">👤 Register New Supervisor Account</h3>
       <div style="display: flex; gap: 10px; flex-wrap: wrap;">
@@ -678,7 +672,6 @@
       <div id="create-user-msg"></div>
     </form>
 
-    <!-- TASK FORM -->
     <form id="task-form" style="margin-bottom: 2rem; background: var(--bg-input); padding: 1.25rem; border-radius: 12px; border: 1px solid rgba(153,198,62,0.2);">
       <input type="hidden" id="editing-task-id" value="" />
       <h3 id="form-heading" style="margin-top: 0; color: var(--flipout-green); font-size: 1.1rem;">Add Job</h3>
@@ -747,14 +740,14 @@
     </div>
 
     <div class="day-selector-container">
-      <button type="button" class="day-tab admin-filter-tab active" data-filter="all">All</button>
-      <button type="button" class="day-tab admin-filter-tab" data-filter="monday">Mon</button>
-      <button type="button" class="day-tab admin-filter-tab" data-filter="tuesday">Tue</button>
-      <button type="button" class="day-tab admin-filter-tab" data-filter="wednesday">Wed</button>
-      <button type="button" class="day-tab admin-filter-tab" data-filter="thursday">Thu</button>
-      <button type="button" class="day-tab admin-filter-tab" data-filter="friday">Fri</button>
-      <button type="button" class="day-tab admin-filter-tab" data-filter="saturday">Sat</button>
-      <button type="button" class="day-tab admin-filter-tab" data-filter="sunday">Sun</button>
+      <button class="day-tab admin-filter-tab active" data-filter="all">All</button>
+      <button class="day-tab admin-filter-tab" data-filter="monday">Mon</button>
+      <button class="day-tab admin-filter-tab" data-filter="tuesday">Tue</button>
+      <button class="day-tab admin-filter-tab" data-filter="wednesday">Wed</button>
+      <button class="day-tab admin-filter-tab" data-filter="thursday">Thu</button>
+      <button class="day-tab admin-filter-tab" data-filter="friday">Fri</button>
+      <button class="day-tab admin-filter-tab" data-filter="saturday">Sat</button>
+      <button class="day-tab admin-filter-tab" data-filter="sunday">Sun</button>
     </div>
 
     <div id="admin-task-list">
@@ -762,8 +755,8 @@
     </div>
 
     <div class="footer" style="display: flex; justify-content: space-between; align-items: center;">
-      <button type="button" id="logout-btn" class="btn-danger">Sign Out</button>
-      <button type="button" id="back-to-app-btn-2" class="admin-link">← Return to Portal</button>
+      <button id="logout-btn" class="btn-danger">Sign Out</button>
+      <button id="back-to-app-btn-2" class="admin-link">← Return to Portal</button>
     </div>
   </div>
 
@@ -773,15 +766,17 @@
       <div class="reward-icon">🎉</div>
       <h3 class="reward-title">FLIP-TASTIC WORK!</h3>
       <p id="reward-message" class="reward-text"></p>
-      <button type="button" onclick="closeRewardModal()" class="btn-primary">Keep Crushing It!</button>
+      <button onclick="closeRewardModal()" class="btn-primary">Keep Crushing It!</button>
     </div>
   </div>
 
   <script>
+    // Initialise Supabase Client
     const SUPABASE_URL = 'https://rtgmpmmcplxwezsleclj.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_PxJuEvkUbVmqNlcq-E2sPg_VBn5vI3F';
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+    // EmailJS Configuration
     const EMAILJS_PUBLIC_KEY = 'kxng6zTg7LBwLYGBU'; 
     const EMAILJS_SERVICE_ID = 'service_0alkyrv';
     const EMAILJS_TEMPLATE_ID = 'YOUR_TEMPLATE_ID';
@@ -798,6 +793,7 @@
     let activeAdminFilter = 'all';
     let currentUserRole = 'supervisor';
 
+    // DOM Elements
     const mainApp = document.getElementById('main-app');
     const adminLoginScreen = document.getElementById('admin-login-screen');
     const backOfficeScreen = document.getElementById('back-office-screen');
@@ -878,10 +874,7 @@
       checkSession();
     }
 
-    // Lock Scroll position during renders to stop screen jumpiness
     async function selectDay(dayName) {
-      const currentScrollPos = window.scrollY;
-      
       currentSelectedDay = dayName;
       currentSelectedDateISO = getDateForDayOfWeek(dayName);
       
@@ -891,6 +884,9 @@
 
       const isToday = days[new Date().getDay()] === dayName;
       document.getElementById('active-day-title').textContent = `${dayName.toUpperCase()} ${isToday ? '(Today)' : ''}`;
+
+      pendingTasksContainer.innerHTML = `<p style="text-align: center; color: var(--text-muted);">Loading tasks...</p>`;
+      completedTasksContainer.innerHTML = '';
 
       const { data: completions } = await supabaseClient
         .from('task_completions')
@@ -913,10 +909,8 @@
 
       if (!tasks || tasks.length === 0) {
         pendingTasksContainer.innerHTML = `<p style="text-align: center; color: var(--text-muted);">No tasks assigned for ${dayName}.</p>`;
-        completedTasksContainer.innerHTML = '';
         updateProgressBar(0, 0);
         completedSection.classList.add('hidden');
-        window.scrollTo(0, currentScrollPos);
         return;
       }
 
@@ -943,9 +937,6 @@
       }
 
       updateProgressBar(completedList.length, tasks.length);
-      
-      // Restore previous scroll position explicitly
-      window.scrollTo(0, currentScrollPos);
     }
 
     function renderTaskCard(task, isDone) {
@@ -1028,6 +1019,7 @@
       };
     }
 
+    // Toggle Completion with Auto-EOD Trigger Evaluation
     window.toggleTaskComplete = async function(taskId, isChecking) {
       const checkbox = document.getElementById(`task-${taskId}`);
 
@@ -1075,10 +1067,37 @@
       }
 
       await selectDay(currentSelectedDay);
+
+      if (isChecking) {
+        await checkAndAutoSendEOD();
+      }
     };
 
-    window.sendEODSummaryEmail = async function() {
-      if (!confirm(`Send the End of Day summary report for ${currentSelectedDay.toUpperCase()} (${currentSelectedDateISO})?`)) return;
+    // Automated Check Strategy for 100% Task Completion
+    async function checkAndAutoSendEOD() {
+      const autoSentKey = `eod_sent_${currentSelectedDateISO}`;
+      if (localStorage.getItem(autoSentKey)) return;
+
+      const { data: dayTasks } = await supabaseClient
+        .from('tasks')
+        .select('id')
+        .eq('is_approved', true)
+        .or(`days.cs.{${currentSelectedDay}},and(is_temporary.eq.true,created_for_date.eq.${currentSelectedDateISO})`);
+
+      const { data: dayCompletions } = await supabaseClient
+        .from('task_completions')
+        .select('task_id')
+        .eq('completed_date', currentSelectedDateISO);
+
+      if (dayTasks && dayCompletions && dayTasks.length > 0 && dayCompletions.length >= dayTasks.length) {
+        localStorage.setItem(autoSentKey, 'true');
+        await sendEODSummaryEmail(true);
+      }
+    }
+
+    // Enhanced EOD Summary Email Sender with Photo Link Payload
+    window.sendEODSummaryEmail = async function(isAutomated = false) {
+      if (!isAutomated && !confirm(`Send the End of Day summary report for ${currentSelectedDay.toUpperCase()} (${currentSelectedDateISO})?`)) return;
 
       try {
         const { data: completions } = await supabaseClient
@@ -1103,13 +1122,17 @@
 
         const completedList = [];
         const pendingList = [];
+        const photoList = [];
 
         (tasks || []).forEach(t => {
           if (completionMap.has(t.id)) {
             const comp = completionMap.get(t.id);
             let detail = t.title;
             if (comp.initials) detail += ` [Initials: ${comp.initials}]`;
-            if (comp.photo_url) detail += ` [Photo Attached]`;
+            if (comp.photo_url) {
+              detail += ` [Photo Attached]`;
+              photoList.push(`• ${t.title}: ${comp.photo_url}`);
+            }
             completedList.push(detail);
           } else {
             pendingList.push(t.title);
@@ -1125,13 +1148,19 @@
           day_name: currentSelectedDay.toUpperCase(),
           completion_rate: `${completionRate}% (${totalCompleted}/${totalTasks})`,
           completed_tasks: completedList.length > 0 ? completedList.map(item => `• ${item}`).join('\n') : 'None',
-          pending_tasks: pendingList.length > 0 ? pendingList.map(item => `• ${item}`).join('\n') : 'None'
+          pending_tasks: pendingList.length > 0 ? pendingList.map(item => `• ${item}`).join('\n') : 'None',
+          photo_gallery: photoList.length > 0 ? photoList.join('\n') : 'No photos uploaded today.'
         };
 
         const activeTemplate = EMAILJS_EOD_TEMPLATE_ID !== 'YOUR_EOD_TEMPLATE_ID' ? EMAILJS_EOD_TEMPLATE_ID : EMAILJS_TEMPLATE_ID;
 
         await emailjs.send(EMAILJS_SERVICE_ID, activeTemplate, templateParams);
-        alert(`✓ EOD Summary Email dispatched for ${currentSelectedDateISO}!`);
+        
+        if (isAutomated) {
+          alert(`🎉 All tasks completed! Automated EOD summary email dispatched for ${currentSelectedDateISO}!`);
+        } else {
+          alert(`✓ EOD summary email dispatched for ${currentSelectedDateISO}!`);
+        }
       } catch (err) {
         alert('Failed to send EOD Email: ' + (err.text || err.message || err));
       }
@@ -1203,10 +1232,10 @@
           </div>
           ${isAdmin ? `
             <div class="admin-actions">
-              <button type="button" class="btn-secondary btn-small" onclick="moveTask('${task.id}', -1)">▲</button>
-              <button type="button" class="btn-secondary btn-small" onclick="moveTask('${task.id}', 1)">▼</button>
-              <button type="button" class="btn-secondary" onclick="startEditTask('${task.id}')">Edit</button>
-              <button type="button" class="btn-danger" onclick="deleteTask('${task.id}')">Delete</button>
+              <button class="btn-secondary btn-small" onclick="moveTask('${task.id}', -1)">▲</button>
+              <button class="btn-secondary btn-small" onclick="moveTask('${task.id}', 1)">▼</button>
+              <button class="btn-secondary" onclick="startEditTask('${task.id}')">Edit</button>
+              <button class="btn-danger" onclick="deleteTask('${task.id}')">Delete</button>
             </div>
           ` : ''}
         </div>
@@ -1235,8 +1264,8 @@
             </div>
           </div>
           <div class="admin-actions">
-            <button type="button" class="btn-primary btn-small" onclick="approveTask('${task.id}')">Approve Job</button>
-            <button type="button" class="btn-danger btn-small" onclick="deleteTask('${task.id}')">Reject</button>
+            <button class="btn-primary btn-small" onclick="approveTask('${task.id}')">Approve Job</button>
+            <button class="btn-danger btn-small" onclick="deleteTask('${task.id}')">Reject</button>
           </div>
         </div>
       `).join('');

@@ -10,21 +10,18 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Flip Out Clean">
 
-  <!-- Google Fonts: Unbounded (Brand Primary Headline Font) & Inter -->
+  <!-- Google Fonts: Unbounded & Inter -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-  <!-- Supabase JS Client -->
+  <!-- Supabase & EmailJS & Confetti Clients -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- EmailJS Client for Admin Notifications -->
   <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
-  <!-- Canvas Confetti CDN -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
   <style>
     :root {
-      /* Official Flip Out 2025 Brand Colours */
       --flipout-green: #99C63E;
       --flipout-pink: #FF509F;
       --flipout-purple: #8D2D91;
@@ -75,7 +72,11 @@
       overflow: hidden;
     }
 
-    /* Top Brand Hero Section */
+    /* Prevent container jitter by locking min-height */
+    #pending-tasks-container, #completed-tasks-container {
+      min-height: 80px;
+    }
+
     .brand-header {
       display: flex;
       flex-direction: column;
@@ -101,7 +102,6 @@
       text-transform: uppercase;
     }
 
-    /* Floating Mascots */
     .mascot-hero-right {
       position: absolute;
       top: -10px;
@@ -123,7 +123,6 @@
       opacity: 0.9;
     }
 
-    /* Progress Bar */
     .progress-wrapper {
       margin-bottom: 1.5rem;
       background: var(--bg-input);
@@ -159,7 +158,6 @@
       box-shadow: 0 0 10px var(--flipout-pink);
     }
 
-    /* Day Selector Navigation */
     .day-selector-container {
       display: flex;
       gap: 6px;
@@ -193,7 +191,6 @@
       transform: translateY(-2px);
     }
 
-    /* Checklist Cards */
     .checklist-header {
       display: flex;
       justify-content: space-between;
@@ -308,7 +305,6 @@
       letter-spacing: 0.5px;
     }
 
-    /* Reward Modal Overlay & Animations */
     .reward-modal-overlay {
       position: fixed;
       top: 0;
@@ -366,7 +362,6 @@
       to { transform: scale(1); opacity: 1; }
     }
 
-    /* Back Office & Approval Window Styles */
     .approval-window {
       background: #2D1402;
       border: 2px solid var(--warning);
@@ -558,16 +553,14 @@
 </head>
 <body>
 
-  <!-- 1. STAFF CHECKLIST VIEW (iPad Default) -->
+  <!-- 1. STAFF CHECKLIST VIEW -->
   <div id="main-app" class="container">
-    <!-- Header with Derrimut Logo and Jet & Max Mascot -->
     <div class="brand-header">
       <img src="FO Derrimut-01.png" alt="Flip Out Derrimut Logo" class="brand-logo">
       <div class="sub-title">Daily Operations Checklist</div>
       <img src="14.png" alt="Jet and Max Ninjas" class="mascot-hero-right">
     </div>
 
-    <!-- Live Progress Bar -->
     <div class="progress-wrapper">
       <div class="progress-header">
         <span>Completion Progress</span>
@@ -579,13 +572,13 @@
     </div>
 
     <div class="day-selector-container">
-      <button class="day-tab main-day-tab" data-day="monday">Mon</button>
-      <button class="day-tab main-day-tab" data-day="tuesday">Tue</button>
-      <button class="day-tab main-day-tab" data-day="wednesday">Wed</button>
-      <button class="day-tab main-day-tab" data-day="thursday">Thu</button>
-      <button class="day-tab main-day-tab" data-day="friday">Fri</button>
-      <button class="day-tab main-day-tab" data-day="saturday">Sat</button>
-      <button class="day-tab main-day-tab" data-day="sunday">Sun</button>
+      <button type="button" class="day-tab main-day-tab" data-day="monday">Mon</button>
+      <button type="button" class="day-tab main-day-tab" data-day="tuesday">Tue</button>
+      <button type="button" class="day-tab main-day-tab" data-day="wednesday">Wed</button>
+      <button type="button" class="day-tab main-day-tab" data-day="thursday">Thu</button>
+      <button type="button" class="day-tab main-day-tab" data-day="friday">Fri</button>
+      <button type="button" class="day-tab main-day-tab" data-day="saturday">Sat</button>
+      <button type="button" class="day-tab main-day-tab" data-day="sunday">Sun</button>
     </div>
 
     <div class="checklist-header">
@@ -593,12 +586,12 @@
       <img src="Dash pose 3.png" alt="Dash Ninja" style="height: 45px; width: auto;">
     </div>
 
-    <!-- Active Pending Tasks -->
+    <!-- Active Tasks Container -->
     <div id="pending-tasks-container">
       <p style="text-align: center; color: var(--text-muted);">Loading tasks from database...</p>
     </div>
 
-    <!-- Completed Tasks Bucket -->
+    <!-- Completed Tasks Container -->
     <div id="completed-section" class="hidden" style="position: relative;">
       <div class="section-divider">✓ Completed Tasks (Click to Uncheck)</div>
       <div id="completed-tasks-container"></div>
@@ -606,10 +599,10 @@
     </div>
 
     <div class="footer" style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
-      <button id="send-eod-main-btn" onclick="sendEODSummaryEmail()" class="btn-secondary" style="font-size: 0.8rem;">
+      <button type="button" id="send-eod-main-btn" onclick="sendEODSummaryEmail()" class="btn-secondary" style="font-size: 0.8rem;">
         ✉️ Dispatch EOD Email
       </button>
-      <button id="show-admin-login-btn" class="admin-link">Back Office Access</button>
+      <button type="button" id="show-admin-login-btn" class="admin-link">Back Office Access</button>
     </div>
   </div>
 
@@ -634,11 +627,11 @@
     </form>
 
     <div class="footer">
-      <button id="back-to-app-btn-1" class="admin-link">← Return to Checklist Portal</button>
+      <button type="button" id="back-to-app-btn-1" class="admin-link">← Return to Checklist Portal</button>
     </div>
   </div>
 
-  <!-- 3. BACK OFFICE TASK MANAGER (Logged In View) -->
+  <!-- 3. BACK OFFICE TASK MANAGER -->
   <div id="back-office-screen" class="container hidden">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 1rem;">
       <div style="display: flex; align-items: center; gap: 12px;">
@@ -651,26 +644,24 @@
       <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
         <span id="user-role-tag" class="role-badge">Supervisor</span>
         <div style="display: flex; gap: 6px;">
-          <!-- EOD Trigger Button (Back Office) -->
-          <button id="send-eod-btn" onclick="sendEODSummaryEmail()" class="btn-secondary">
+          <button type="button" id="send-eod-btn" onclick="sendEODSummaryEmail()" class="btn-secondary">
             ✉️ EOD Report
           </button>
-          <!-- CSV Export Button (Admin Only) -->
-          <button id="export-csv-btn" onclick="exportCompletionsToCSV()" class="btn-success admin-only hidden">
+          <button type="button" id="export-csv-btn" onclick="exportCompletionsToCSV()" class="btn-success admin-only hidden">
             📥 Export CSV
           </button>
         </div>
       </div>
     </div>
 
-    <!-- DEDICATED ADMIN APPROVAL WINDOW (Visible ONLY to Admin) -->
+    <!-- DEDICATED ADMIN APPROVAL WINDOW -->
     <div id="approval-queue-section" class="approval-window hidden">
       <h3 style="margin-top: 0; margin-bottom: 0.5rem; font-size: 1.1rem; color: var(--warning);">📥 Pending Job Requests (Admin Approval)</h3>
       <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Review supervisor job submissions below. Click "Approve" to publish or "Reject" to discard.</p>
       <div id="approval-task-list"></div>
     </div>
 
-    <!-- CREATE SUPERVISOR ACCOUNT FORM (Admin Only) -->
+    <!-- CREATE SUPERVISOR ACCOUNT FORM -->
     <form id="create-user-form" class="admin-only hidden" style="margin-bottom: 2rem; background: var(--bg-card-alt); padding: 1.25rem; border-radius: 12px; border: 1px solid rgba(255,80,159,0.3);">
       <h3 style="margin-top: 0; color: var(--flipout-pink); font-size: 1rem;">👤 Register New Supervisor Account</h3>
       <div style="display: flex; gap: 10px; flex-wrap: wrap;">
@@ -687,7 +678,7 @@
       <div id="create-user-msg"></div>
     </form>
 
-    <!-- Task Form (Accessible to Admin & Supervisors) -->
+    <!-- TASK FORM -->
     <form id="task-form" style="margin-bottom: 2rem; background: var(--bg-input); padding: 1.25rem; border-radius: 12px; border: 1px solid rgba(153,198,62,0.2);">
       <input type="hidden" id="editing-task-id" value="" />
       <h3 id="form-heading" style="margin-top: 0; color: var(--flipout-green); font-size: 1.1rem;">Add Job</h3>
@@ -751,20 +742,19 @@
       </div>
     </form>
 
-    <!-- Active Task Management Filter -->
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
       <h3 style="margin: 0; font-size: 1.1rem; color: var(--flipout-green);">Active Tasks</h3>
     </div>
 
     <div class="day-selector-container">
-      <button class="day-tab admin-filter-tab active" data-filter="all">All</button>
-      <button class="day-tab admin-filter-tab" data-filter="monday">Mon</button>
-      <button class="day-tab admin-filter-tab" data-filter="tuesday">Tue</button>
-      <button class="day-tab admin-filter-tab" data-filter="wednesday">Wed</button>
-      <button class="day-tab admin-filter-tab" data-filter="thursday">Thu</button>
-      <button class="day-tab admin-filter-tab" data-filter="friday">Fri</button>
-      <button class="day-tab admin-filter-tab" data-filter="saturday">Sat</button>
-      <button class="day-tab admin-filter-tab" data-filter="sunday">Sun</button>
+      <button type="button" class="day-tab admin-filter-tab active" data-filter="all">All</button>
+      <button type="button" class="day-tab admin-filter-tab" data-filter="monday">Mon</button>
+      <button type="button" class="day-tab admin-filter-tab" data-filter="tuesday">Tue</button>
+      <button type="button" class="day-tab admin-filter-tab" data-filter="wednesday">Wed</button>
+      <button type="button" class="day-tab admin-filter-tab" data-filter="thursday">Thu</button>
+      <button type="button" class="day-tab admin-filter-tab" data-filter="friday">Fri</button>
+      <button type="button" class="day-tab admin-filter-tab" data-filter="saturday">Sat</button>
+      <button type="button" class="day-tab admin-filter-tab" data-filter="sunday">Sun</button>
     </div>
 
     <div id="admin-task-list">
@@ -772,28 +762,26 @@
     </div>
 
     <div class="footer" style="display: flex; justify-content: space-between; align-items: center;">
-      <button id="logout-btn" class="btn-danger">Sign Out</button>
-      <button id="back-to-app-btn-2" class="admin-link">← Return to Portal</button>
+      <button type="button" id="logout-btn" class="btn-danger">Sign Out</button>
+      <button type="button" id="back-to-app-btn-2" class="admin-link">← Return to Portal</button>
     </div>
   </div>
 
-  <!-- 4. MOTIVATIONAL REWARD MODAL (Goal 1 Pop-up) -->
+  <!-- 4. MOTIVATIONAL REWARD MODAL -->
   <div id="reward-modal" class="reward-modal-overlay hidden">
     <div class="reward-modal-card">
       <div class="reward-icon">🎉</div>
       <h3 class="reward-title">FLIP-TASTIC WORK!</h3>
       <p id="reward-message" class="reward-text"></p>
-      <button onclick="closeRewardModal()" class="btn-primary">Keep Crushing It!</button>
+      <button type="button" onclick="closeRewardModal()" class="btn-primary">Keep Crushing It!</button>
     </div>
   </div>
 
   <script>
-    // Initialise Supabase Client
     const SUPABASE_URL = 'https://rtgmpmmcplxwezsleclj.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_PxJuEvkUbVmqNlcq-E2sPg_VBn5vI3F';
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // EmailJS Configuration for Admin Notifications & EOD Reports
     const EMAILJS_PUBLIC_KEY = 'kxng6zTg7LBwLYGBU'; 
     const EMAILJS_SERVICE_ID = 'service_0alkyrv';
     const EMAILJS_TEMPLATE_ID = 'YOUR_TEMPLATE_ID';
@@ -810,7 +798,6 @@
     let activeAdminFilter = 'all';
     let currentUserRole = 'supervisor';
 
-    // DOM Elements
     const mainApp = document.getElementById('main-app');
     const adminLoginScreen = document.getElementById('admin-login-screen');
     const backOfficeScreen = document.getElementById('back-office-screen');
@@ -823,7 +810,6 @@
     const mainDayTabs = document.querySelectorAll('.main-day-tab');
     const adminFilterTabs = document.querySelectorAll('.admin-filter-tab');
 
-    // Dynamic 10,000+ Combination Motivational Message Engine (Goal 1)
     const messageComponents = {
       openers: [
         "Legendary work!", "Flip-tastic job!", "Unreal effort!", "Boom!", "Sensational effort!",
@@ -854,16 +840,10 @@
     }
 
     function generateMotivationalMessage() {
-      const opener = getRandomElement(messageComponents.openers);
-      const action = getRandomElement(messageComponents.actions);
-      const impact = getRandomElement(messageComponents.impacts);
-      const closer = getRandomElement(messageComponents.closers);
-
-      return `${opener} ${action} ${impact} ${closer}`;
+      return `${getRandomElement(messageComponents.openers)} ${getRandomElement(messageComponents.actions)} ${getRandomElement(messageComponents.impacts)} ${getRandomElement(messageComponents.closers)}`;
     }
 
     function triggerRewardEffect() {
-      // 1. Launch Flip Out Branded Confetti Burst
       if (typeof confetti === 'function') {
         confetti({
           particleCount: 120,
@@ -872,11 +852,7 @@
           colors: ['#99C63E', '#FF509F', '#8D2D91', '#FFFFFF']
         });
       }
-
-      // 2. Inject Dynamic Motivational Message
       document.getElementById('reward-message').textContent = generateMotivationalMessage();
-
-      // 3. Display Modal
       document.getElementById('reward-modal').classList.remove('hidden');
     }
 
@@ -897,14 +873,15 @@
       return targetDate.toISOString().split('T')[0];
     }
 
-    // Initialise App
     async function initialiseApp() {
       selectDay(currentSelectedDay);
       checkSession();
     }
 
-    // Select & Fetch Day Tasks
+    // Lock Scroll position during renders to stop screen jumpiness
     async function selectDay(dayName) {
+      const currentScrollPos = window.scrollY;
+      
       currentSelectedDay = dayName;
       currentSelectedDateISO = getDateForDayOfWeek(dayName);
       
@@ -914,9 +891,6 @@
 
       const isToday = days[new Date().getDay()] === dayName;
       document.getElementById('active-day-title').textContent = `${dayName.toUpperCase()} ${isToday ? '(Today)' : ''}`;
-
-      pendingTasksContainer.innerHTML = `<p style="text-align: center; color: var(--text-muted);">Loading tasks...</p>`;
-      completedTasksContainer.innerHTML = '';
 
       const { data: completions } = await supabaseClient
         .from('task_completions')
@@ -939,8 +913,10 @@
 
       if (!tasks || tasks.length === 0) {
         pendingTasksContainer.innerHTML = `<p style="text-align: center; color: var(--text-muted);">No tasks assigned for ${dayName}.</p>`;
+        completedTasksContainer.innerHTML = '';
         updateProgressBar(0, 0);
         completedSection.classList.add('hidden');
+        window.scrollTo(0, currentScrollPos);
         return;
       }
 
@@ -967,6 +943,9 @@
       }
 
       updateProgressBar(completedList.length, tasks.length);
+      
+      // Restore previous scroll position explicitly
+      window.scrollTo(0, currentScrollPos);
     }
 
     function renderTaskCard(task, isDone) {
@@ -1000,7 +979,6 @@
       document.getElementById('progress-bar-fill').style.width = `${percent}%`;
     }
 
-    // Handle Image Selection and Storage Bucket Upload
     window.handleTaskPhotoSelect = async function(fileInput, taskId) {
       const files = fileInput.files;
       if (!files || files.length === 0) return;
@@ -1032,7 +1010,6 @@
       return publicUrlData.publicUrl;
     };
 
-    // Helper validation logic integrated into Vanilla JS execution
     function isTaskValid(taskId) {
       const initialsInput = document.getElementById(`initials-${taskId}`);
       const initials = initialsInput ? initialsInput.value.trim() : '';
@@ -1051,7 +1028,6 @@
       };
     }
 
-    // Toggle Task Completion with Strict Validation Checks & Reward Trigger
     window.toggleTaskComplete = async function(taskId, isChecking) {
       const checkbox = document.getElementById(`task-${taskId}`);
 
@@ -1082,8 +1058,9 @@
         if (error) {
           alert('Error saving completion: ' + error.message);
           if (checkbox) checkbox.checked = false;
+          return;
         } else {
-          triggerRewardEffect(); // Triggers Confetti & Dynamic Motivational Message
+          triggerRewardEffect();
         }
       } else {
         const { error } = await supabaseClient.from('task_completions')
@@ -1091,13 +1068,15 @@
           .eq('task_id', taskId)
           .eq('completed_date', currentSelectedDateISO);
 
-        if (error) alert('Error unchecking task: ' + error.message);
+        if (error) {
+          alert('Error unchecking task: ' + error.message);
+          return;
+        }
       }
 
-      selectDay(currentSelectedDay);
+      await selectDay(currentSelectedDay);
     };
 
-    // Send EOD Summary Email
     window.sendEODSummaryEmail = async function() {
       if (!confirm(`Send the End of Day summary report for ${currentSelectedDay.toUpperCase()} (${currentSelectedDateISO})?`)) return;
 
@@ -1158,7 +1137,6 @@
       }
     };
 
-    // CSV Export Function for Compliance Audits
     window.exportCompletionsToCSV = async function() {
       const { data, error } = await supabaseClient
         .from('task_completions')
@@ -1188,7 +1166,6 @@
       a.click();
     };
 
-    // Back Office & Permissions Logic
     async function loadAdminTasks() {
       const { data: tasks, error } = await supabaseClient.from('tasks').select('*').order('sort_order', { ascending: true });
       
@@ -1226,10 +1203,10 @@
           </div>
           ${isAdmin ? `
             <div class="admin-actions">
-              <button class="btn-secondary btn-small" onclick="moveTask('${task.id}', -1)">▲</button>
-              <button class="btn-secondary btn-small" onclick="moveTask('${task.id}', 1)">▼</button>
-              <button class="btn-secondary" onclick="startEditTask('${task.id}')">Edit</button>
-              <button class="btn-danger" onclick="deleteTask('${task.id}')">Delete</button>
+              <button type="button" class="btn-secondary btn-small" onclick="moveTask('${task.id}', -1)">▲</button>
+              <button type="button" class="btn-secondary btn-small" onclick="moveTask('${task.id}', 1)">▼</button>
+              <button type="button" class="btn-secondary" onclick="startEditTask('${task.id}')">Edit</button>
+              <button type="button" class="btn-danger" onclick="deleteTask('${task.id}')">Delete</button>
             </div>
           ` : ''}
         </div>
@@ -1237,7 +1214,6 @@
     }
 
     function renderApprovalQueue() {
-      // ONLY Admin can see the Dedicated Approval Window
       if (currentUserRole !== 'admin') {
         approvalQueueSection.classList.add('hidden');
         return;
@@ -1259,14 +1235,13 @@
             </div>
           </div>
           <div class="admin-actions">
-            <button class="btn-primary btn-small" onclick="approveTask('${task.id}')">Approve Job</button>
-            <button class="btn-danger btn-small" onclick="deleteTask('${task.id}')">Reject</button>
+            <button type="button" class="btn-primary btn-small" onclick="approveTask('${task.id}')">Approve Job</button>
+            <button type="button" class="btn-danger btn-small" onclick="deleteTask('${task.id}')">Reject</button>
           </div>
         </div>
       `).join('');
     }
 
-    // Move Task Priority (Admin Only)
     window.moveTask = async function(taskId, direction) {
       if (currentUserRole !== 'admin') return;
       const index = allLoadedTasks.findIndex(t => t.id === taskId);
@@ -1336,7 +1311,6 @@
 
     document.getElementById('cancel-edit-btn').addEventListener('click', resetTaskForm);
 
-    // Save or Submit Job Handler
     document.getElementById('task-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const editingId = document.getElementById('editing-task-id').value;
@@ -1379,7 +1353,6 @@
       }
     });
 
-    // Send Email Notification to Admin
     function notifyAdminViaEmail(jobTitle) {
       if (typeof emailjs !== 'undefined' && EMAILJS_PUBLIC_KEY !== 'YOUR_EMAILJS_PUBLIC_KEY') {
         emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
@@ -1389,7 +1362,6 @@
       }
     }
 
-    // Register Supervisor User Account
     document.getElementById('create-user-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const email = document.getElementById('new-user-email').value;
@@ -1418,7 +1390,6 @@
       }
     });
 
-    // Delete / Reject Task
     window.deleteTask = async function(id) {
       if (confirm('Are you sure you want to remove this job?')) {
         await supabaseClient.from('tasks').delete().eq('id', id);
@@ -1427,7 +1398,6 @@
       }
     };
 
-    // Auth Handlers
     document.getElementById('admin-login-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const email = document.getElementById('admin-email').value;
@@ -1485,14 +1455,13 @@
       checkSession();
     }
 
-    // Navigation Listeners
     document.getElementById('show-admin-login-btn').addEventListener('click', async () => {
       const { data: { session } } = await supabaseClient.auth.getSession();
       if (session) {
         showBackOffice();
       } else {
         mainApp.classList.add('hidden');
-        adminLoginScreen.remove('hidden');
+        adminLoginScreen.classList.remove('hidden');
       }
     });
 
@@ -1516,4 +1485,3 @@
   </script>
 </body>
 </html>
-

@@ -221,8 +221,8 @@
     }
 
     .task-card.completed {
-      opacity: 0.55;
-      border-color: rgba(153, 198, 62, 0.3);
+      opacity: 0.75;
+      border-color: rgba(153, 198, 62, 0.4);
       background: var(--bg-input);
     }
 
@@ -281,7 +281,7 @@
       font-size: 0.8rem;
       font-weight: 600;
       cursor: pointer;
-      display: flex;
+      display: inline-flex;
       align-items: center;
       gap: 6px;
       transition: all 0.2s ease;
@@ -290,6 +290,26 @@
     .photo-upload-btn:hover {
       background: var(--flipout-pink);
       color: #fff;
+    }
+
+    .view-photo-btn {
+      background: rgba(153, 198, 62, 0.2);
+      border: 1px solid var(--flipout-green);
+      color: #fff;
+      padding: 0.45rem 0.8rem;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .view-photo-btn:hover {
+      background: var(--flipout-green);
+      color: var(--flipout-velvet);
     }
 
     .badge-temp {
@@ -411,7 +431,6 @@
       border-color: var(--flipout-green);
     }
 
-    /* Password Input Visibility Toggle Container */
     .password-container {
       position: relative;
       display: flex;
@@ -791,7 +810,6 @@
         </label>
       </div>
 
-      <!-- BUTTON ACTIONS ADJUSTED ACCORDING TO USER ROLE -->
       <div style="display: flex; gap: 10px; flex-wrap: wrap;">
         <button type="button" id="submit-temp-task-btn" onclick="handleTaskFormSubmit(true)" class="btn-primary" style="flex: 1;">+ Add Temporary Job (Today Only)</button>
         <button type="button" id="submit-perm-task-btn" onclick="handleTaskFormSubmit(false)" class="btn-secondary" style="flex: 1;">📩 Send Request for Permanent Job</button>
@@ -974,12 +992,16 @@
         pendingTasksContainer.innerHTML = `<p style="text-align: center; color: var(--text-muted);">Loading tasks...</p>`;
       }
 
+      // Retrieve completion data along with saved photo URLs
       const { data: completions } = await supabaseClient
         .from('task_completions')
-        .select('task_id')
+        .select('task_id, initials, photo_url')
         .eq('completed_date', currentSelectedDateISO);
 
-      const dayCompletedTaskIds = new Set(completions ? completions.map(c => c.task_id) : []);
+      const completionMap = new Map();
+      if (completions) {
+        completions.forEach(c => completionMap.set(c.task_id, c));
+      }
 
       const { data: tasks, error } = await supabaseClient
         .from('tasks')
@@ -1004,8 +1026,12 @@
       const completedList = [];
 
       tasks.forEach(task => {
-        const isDone = dayCompletedTaskIds.has(task.id);
-        const cardHtml = renderTaskCard(task, isDone);
+        const completionData = completionMap.get(task.id);
+        const isDone = !!completionData;
+        const photoUrl = completionData ? completionData.photo_url : null;
+        const initials = completionData ? completionData.initials : '';
+
+        const cardHtml = renderTaskCard(task, isDone, photoUrl, initials);
         if (isDone) {
           completedList.push(cardHtml);
         } else {
@@ -1025,7 +1051,7 @@
       updateProgressBar(completedList.length, tasks.length);
     }
 
-    function renderTaskCard(task, isDone) {
+    function renderTaskCard(task, isDone, savedPhotoUrl = null, savedInitials = '') {
       const maxPhotos = task.max_photos || 1;
       return `
         <div class="task-card ${isDone ? 'completed' : ''}" id="card-${task.id}">
@@ -1037,12 +1063,17 @@
             </label>
           </div>
           <div class="task-meta">
-            ${task.requires_initials ? `<input type="text" class="initials-input" id="initials-${task.id}" placeholder="Initials" maxlength="4" ${isDone ? 'disabled' : ''}>` : ''}
+            ${task.requires_initials ? `<input type="text" class="initials-input" id="initials-${task.id}" value="${savedInitials || ''}" placeholder="Initials" maxlength="4" ${isDone ? 'disabled' : ''}>` : ''}
             ${task.requires_photo ? `
-              <label class="photo-upload-btn">
-                📷 Photos (Up to ${maxPhotos})
+              <label class="photo-upload-btn" ${isDone ? 'style="display:none;"' : ''}>
+                📷 ${savedPhotoUrl ? 'Change Photo' : `Upload Photo (Max ${maxPhotos})`}
                 <input type="file" id="photos-${task.id}" accept="image/*" capture="camera" multiple ${isDone ? 'disabled' : ''} style="display:none;" onchange="handleTaskPhotoSelect(this, '${task.id}')">
               </label>
+              ${savedPhotoUrl ? `
+                <a href="${savedPhotoUrl}" target="_blank" rel="noopener noreferrer" class="view-photo-btn">
+                  🖼️ View Photo
+                </a>
+              ` : ''}
               <span id="photo-filename-${task.id}" style="font-size:0.75rem; color: var(--flipout-green); font-weight: 600;"></span>
             ` : ''}
           </div>
@@ -1082,9 +1113,13 @@
         .from('task-photos')
         .getPublicUrl(filePath);
 
-      if (statusSpan) statusSpan.textContent = '✓ Photo attached';
-      fileInput.dataset.uploadedUrl = publicUrlData.publicUrl;
-      return publicUrlData.publicUrl;
+      const uploadedUrl = publicUrlData.publicUrl;
+      fileInput.dataset.uploadedUrl = uploadedUrl;
+
+      if (statusSpan) {
+        statusSpan.innerHTML = `✓ Uploaded! <a href="${uploadedUrl}" target="_blank" rel="noopener noreferrer" style="color: var(--flipout-pink); text-decoration: underline; margin-left: 6px;">[View Uploaded Image]</a>`;
+      }
+      return uploadedUrl;
     };
 
     window.toggleTaskComplete = async function(taskId, isChecking) {
@@ -1185,7 +1220,8 @@
             if (comp.initials) detail += ` [Initials: ${comp.initials}]`;
             if (comp.photo_url) {
               detail += ` [Photo Attached]`;
-              photoList.push(`• ${t.title}: ${comp.photo_url}`);
+              // Format photo links as clickable anchor tags & plain URL for email clients
+              photoList.push(`• ${t.title}: <a href="${comp.photo_url}" target="_blank">View Image</a> (${comp.photo_url})`);
             }
             completedList.push(detail);
           } else {
@@ -1384,7 +1420,6 @@
       document.getElementById('new-task-photo').checked = false;
       document.getElementById('new-task-initials').checked = true;
       
-      // Default Active Days completely unselected when adding a job
       document.querySelectorAll('.day-check').forEach(cb => cb.checked = false);
 
       document.getElementById('form-heading').textContent = 'Add Job';
@@ -1409,7 +1444,6 @@
 
     document.getElementById('cancel-edit-btn').addEventListener('click', resetTaskForm);
 
-    // FLIPPED SUBMISSION HANDLER: Main button adds temporary job, secondary sends permanent job for admin approval
     window.handleTaskFormSubmit = async function(isTemporaryJobRequested) {
       const title = document.getElementById('new-task-title').value.trim();
       if (!title) {
@@ -1465,7 +1499,6 @@
       }
     }
 
-    // Account Creation & Admin Reset Tools
     document.getElementById('create-user-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const email = document.getElementById('new-user-email').value;
@@ -1492,7 +1525,6 @@
       }
     });
 
-    // Admin Password Reset Trigger
     window.adminTriggerUserReset = async function() {
       const email = document.getElementById('admin-reset-target-email').value.trim();
       const msgDiv = document.getElementById('admin-reset-msg');
@@ -1519,7 +1551,6 @@
       }
     };
 
-    // Worker Self Password Reset
     document.getElementById('change-my-password-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const newPassword = document.getElementById('self-new-password').value;
@@ -1540,7 +1571,6 @@
       }
     });
 
-    // Login Screen Worker Reset Trigger
     window.triggerWorkerPasswordReset = async function() {
       const email = prompt('Enter your registered email address to receive a password reset link:');
       if (email && email.trim()) {

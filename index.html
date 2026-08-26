@@ -900,6 +900,20 @@
       }
     };
 
+    // Helper to safely parse multi-photo storage format (handles legacy single URL strings & JSON array strings)
+    function parsePhotoUrls(photoData) {
+      if (!photoData) return [];
+      if (Array.isArray(photoData)) return photoData;
+      try {
+        const parsed = JSON.parse(photoData);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {}
+      if (typeof photoData === 'string' && photoData.trim().length > 0) {
+        return photoData.split(',').map(u => u.trim()).filter(u => u.startsWith('http'));
+      }
+      return [];
+    }
+
     const messageComponents = {
       openers: [
         "Legendary work!", "Flip-tastic job!", "Unreal effort!", "Boom!", "Sensational effort!",
@@ -1053,6 +1067,8 @@
 
     function renderTaskCard(task, isDone, savedPhotoUrl = null, savedInitials = '') {
       const maxPhotos = task.max_photos || 1;
+      const photoUrls = parsePhotoUrls(savedPhotoUrl);
+
       return `
         <div class="task-card ${isDone ? 'completed' : ''}" id="card-${task.id}">
           <div class="task-main">
@@ -1066,14 +1082,16 @@
             ${task.requires_initials ? `<input type="text" class="initials-input" id="initials-${task.id}" value="${savedInitials || ''}" placeholder="Initials" maxlength="4" ${isDone ? 'disabled' : ''}>` : ''}
             ${task.requires_photo ? `
               <label class="photo-upload-btn" ${isDone ? 'style="display:none;"' : ''}>
-                📷 ${savedPhotoUrl ? 'Change Photo' : `Upload Photo (Max ${maxPhotos})`}
-                <input type="file" id="photos-${task.id}" accept="image/*" capture="camera" multiple ${isDone ? 'disabled' : ''} style="display:none;" onchange="handleTaskPhotoSelect(this, '${task.id}')">
+                📷 ${photoUrls.length > 0 ? 'Upload More Photos' : `Upload Photos (Max ${maxPhotos})`}
+                <input type="file" id="photos-${task.id}" accept="image/*" capture="camera" multiple ${isDone ? 'disabled' : ''} style="display:none;" onchange="handleTaskPhotoSelect(this, '${task.id}', ${maxPhotos})">
               </label>
-              ${savedPhotoUrl ? `
-                <a href="${savedPhotoUrl}" target="_blank" rel="noopener noreferrer" class="view-photo-btn">
-                  🖼️ View Photo
-                </a>
-              ` : ''}
+              <div id="photo-links-${task.id}" style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;">
+                ${photoUrls.map((url, i) => `
+                  <a href="${url}" target="_blank" rel="noopener noreferrer" class="view-photo-btn">
+                    🖼️ Photo ${photoUrls.length > 1 ? i + 1 : ''}
+                  </a>
+                `).join('')}
+              </div>
               <span id="photo-filename-${task.id}" style="font-size:0.75rem; color: var(--flipout-green); font-weight: 600;"></span>
             ` : ''}
           </div>
@@ -1087,39 +1105,54 @@
       document.getElementById('progress-bar-fill').style.width = `${percent}%`;
     }
 
-    window.handleTaskPhotoSelect = async function(fileInput, taskId) {
-      const files = fileInput.files;
+    window.handleTaskPhotoSelect = async function(fileInput, taskId, maxPhotos = 1) {
+      const files = Array.from(fileInput.files);
       if (!files || files.length === 0) return;
 
-      const file = files[0];
-      const filePath = `completions/${Date.now()}_${file.name}`;
-      const statusSpan = document.getElementById(`photo-filename-${taskId}`);
-      
-      if (statusSpan) statusSpan.textContent = 'Uploading...';
-
-      const { data, error } = await supabaseClient
-        .storage
-        .from('task-photos')
-        .upload(filePath, file);
-
-      if (error) {
-        alert('Photo upload failed: ' + error.message);
-        if (statusSpan) statusSpan.textContent = 'Upload failed';
-        return null;
+      if (files.length > maxPhotos) {
+        alert(`You can upload a maximum of ${maxPhotos} photo(s) for this task.`);
+        fileInput.value = '';
+        return;
       }
 
-      const { data: publicUrlData } = supabaseClient
-        .storage
-        .from('task-photos')
-        .getPublicUrl(filePath);
+      const statusSpan = document.getElementById(`photo-filename-${taskId}`);
+      if (statusSpan) statusSpan.textContent = `Uploading ${files.length} photo(s)...`;
 
-      const uploadedUrl = publicUrlData.publicUrl;
-      fileInput.dataset.uploadedUrl = uploadedUrl;
+      const uploadedUrls = [];
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const filePath = `completions/${Date.now()}_${i}_${file.name}`;
+
+        const { data, error } = await supabaseClient
+          .storage
+          .from('task-photos')
+          .upload(filePath, file);
+
+        if (error) {
+          alert(`Photo ${i + 1} upload failed: ` + error.message);
+          if (statusSpan) statusSpan.textContent = 'Upload failed';
+          return null;
+        }
+
+        const { data: publicUrlData } = supabaseClient
+          .storage
+          .from('task-photos')
+          .getPublicUrl(filePath);
+
+        uploadedUrls.push(publicUrlData.publicUrl);
+      }
+
+      // Store uploaded URLs on element as JSON string
+      fileInput.dataset.uploadedUrls = JSON.stringify(uploadedUrls);
 
       if (statusSpan) {
-        statusSpan.innerHTML = `✓ Uploaded! <a href="${uploadedUrl}" target="_blank" rel="noopener noreferrer" style="color: var(--flipout-pink); text-decoration: underline; margin-left: 6px;">[View Uploaded Image]</a>`;
+        const linksHtml = uploadedUrls.map((url, i) => 
+          `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color: var(--flipout-pink); text-decoration: underline; margin-left: 4px;">[Photo ${uploadedUrls.length > 1 ? i + 1 : ''}]</a>`
+        ).join(' ');
+        statusSpan.innerHTML = `✓ ${uploadedUrls.length} Photo(s) Ready! ${linksHtml}`;
       }
-      return uploadedUrl;
+      return uploadedUrls;
     };
 
     window.toggleTaskComplete = async function(taskId, isChecking) {
@@ -1129,7 +1162,11 @@
         const initialsInput = document.getElementById(`initials-${taskId}`);
         const initials = initialsInput ? initialsInput.value.trim() : '';
         const photoInput = document.getElementById(`photos-${taskId}`);
-        const photoUrl = photoInput ? (photoInput.dataset.uploadedUrl || null) : null;
+        
+        let photoUrl = null;
+        if (photoInput && photoInput.dataset.uploadedUrls) {
+          photoUrl = photoInput.dataset.uploadedUrls;
+        }
 
         const { error } = await supabaseClient.from('task_completions').insert([{
           task_id: taskId,
@@ -1186,7 +1223,7 @@
     }
 
     window.sendEODSummaryEmail = async function(isAutomated = false) {
-      if (!isAutomated && !confirm(`Send the End of Day summary report for ${currentSelectedDay.toUpperCase()} (${currentSelectedDateISO})?`)) return;
+      if (!isAutomated && !confirm(`Send EOD summary report for ${currentSelectedDay.toUpperCase()} (${currentSelectedDateISO})?`)) return;
 
       try {
         const { data: completions } = await supabaseClient
@@ -1201,56 +1238,51 @@
           .or(`days.cs.{${currentSelectedDay}},and(is_temporary.eq.true,created_for_date.eq.${currentSelectedDateISO})`)
           .order('sort_order', { ascending: true });
 
-        if (error) {
-          alert('Failed to retrieve EOD task status: ' + error.message);
-          return;
-        }
+        if (error) return alert('Failed to fetch tasks: ' + error.message);
 
         const completionMap = new Map();
         (completions || []).forEach(c => completionMap.set(c.task_id, c));
 
-        const completedList = [];
-        const pendingList = [];
-        const photoList = [];
+        const completedDetails = [];
+        const photoElements = [];
 
         (tasks || []).forEach(t => {
           if (completionMap.has(t.id)) {
             const comp = completionMap.get(t.id);
-            let detail = t.title;
-            if (comp.initials) detail += ` [Initials: ${comp.initials}]`;
-            if (comp.photo_url) {
-              detail += ` [Photo Attached]`;
-              // Format photo links as clickable anchor tags & plain URL for email clients
-              photoList.push(`• ${t.title}: <a href="${comp.photo_url}" target="_blank">View Image</a> (${comp.photo_url})`);
+            let line = `• ${t.title}`;
+            if (comp.initials) line += ` [Initials: ${comp.initials}]`;
+            completedDetails.push(line);
+
+            const urls = parsePhotoUrls(comp.photo_url);
+            if (urls.length > 0) {
+              const photoLinks = urls.map((u, i) => `<a href="${u}" target="_blank" style="color: #FF509F; text-decoration: underline; font-weight: bold; margin-right: 8px;">🖼️ View Photo ${urls.length > 1 ? i + 1 : ''}</a>`).join('');
+              photoElements.push(`
+                <div style="margin-bottom: 8px;">
+                  <strong style="color: #99C63E;">• ${t.title}:</strong><br>
+                  ${photoLinks}
+                </div>
+              `);
             }
-            completedList.push(detail);
-          } else {
-            pendingList.push(t.title);
           }
         });
 
         const totalTasks = tasks.length;
-        const totalCompleted = completedList.length;
-        const completionRate = totalTasks > 0 ? Math.round((totalCompleted / totalTasks) * 100) : 0;
+        const totalCompleted = completedDetails.length;
+        const ratePercent = totalTasks > 0 ? Math.round((totalCompleted / totalTasks) * 100) : 0;
 
         const templateParams = {
           report_date: currentSelectedDateISO,
-          day_name: currentSelectedDay.toUpperCase(),
-          completion_rate: `${completionRate}% (${totalCompleted}/${totalTasks})`,
-          completed_tasks: completedList.length > 0 ? completedList.map(item => `• ${item}`).join('\n') : 'None',
-          pending_tasks: pendingList.length > 0 ? pendingList.map(item => `• ${item}`).join('\n') : 'None',
-          photo_gallery: photoList.length > 0 ? photoList.join('\n') : 'No photos uploaded today.'
+          completion_rate: `${ratePercent}%`,
+          completed_count: totalCompleted,
+          total_count: totalTasks,
+          summary_details: completedDetails.length > 0 ? completedDetails.join('\n') : 'No completed tasks recorded.',
+          photo_gallery: photoElements.length > 0 ? photoElements.join('') : '<span style="color: #A0A0A0;">No photos uploaded today.</span>'
         };
 
         const activeTemplate = EMAILJS_EOD_TEMPLATE_ID !== 'YOUR_EOD_TEMPLATE_ID' ? EMAILJS_EOD_TEMPLATE_ID : EMAILJS_TEMPLATE_ID;
-
         await emailjs.send(EMAILJS_SERVICE_ID, activeTemplate, templateParams);
         
-        if (isAutomated) {
-          alert(`🎉 All tasks completed! Automated EOD summary email dispatched for ${currentSelectedDateISO}!`);
-        } else {
-          alert(`✓ EOD summary email dispatched for ${currentSelectedDateISO}!`);
-        }
+        alert(`✓ EOD summary report dispatched successfully!`);
       } catch (err) {
         alert('Failed to send EOD Email: ' + (err.text || err.message || err));
       }
@@ -1267,14 +1299,15 @@
         return alert('No task completion records found to export.');
       }
 
-      let csv = 'Completion ID,Task Title,Category,Completed Date,Initials,Photo URL,Timestamp\n';
+      let csv = 'Completion ID,Task Title,Category,Completed Date,Initials,Photo URLs,Timestamp\n';
       data.forEach(row => {
         const taskTitle = row.tasks?.title ? row.tasks.title.replace(/"/g, '""') : 'Deleted Task';
         const category = row.tasks?.category ? row.tasks.category.replace(/"/g, '""') : 'N/A';
         const initials = row.initials ? row.initials.replace(/"/g, '""') : 'N/A';
-        const photoUrl = row.photo_url || 'None';
+        const urls = parsePhotoUrls(row.photo_url);
+        const photoUrlStr = urls.length > 0 ? urls.join(' | ') : 'None';
 
-        csv += `"${row.id}","${taskTitle}","${category}","${row.completed_date}","${initials}","${photoUrl}","${row.created_at || ''}"\n`;
+        csv += `"${row.id}","${taskTitle}","${category}","${row.completed_date}","${initials}","${photoUrlStr}","${row.created_at || ''}"\n`;
       });
 
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });

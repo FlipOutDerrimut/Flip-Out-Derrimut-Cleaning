@@ -900,7 +900,7 @@
       }
     };
 
-    // Helper to safely parse multi-photo storage format (handles legacy single URL strings & JSON array strings)
+    // Helper to safely parse multi-photo storage format
     function parsePhotoUrls(photoData) {
       if (!photoData) return [];
       if (Array.isArray(photoData)) return photoData;
@@ -981,7 +981,7 @@
       selectDay(currentSelectedDay);
       checkSession();
 
-      // Background Auto-Refresh Polling (15s Interval for Live Sync on iPad Kiosk)
+      // Background Auto-Refresh Polling
       setInterval(() => {
         if (!mainApp.classList.contains('hidden')) {
           selectDay(currentSelectedDay, true);
@@ -1006,7 +1006,6 @@
         pendingTasksContainer.innerHTML = `<p style="text-align: center; color: var(--text-muted);">Loading tasks...</p>`;
       }
 
-      // Retrieve completion data along with saved photo URLs
       const { data: completions } = await supabaseClient
         .from('task_completions')
         .select('task_id, initials, photo_url')
@@ -1143,7 +1142,6 @@
         uploadedUrls.push(publicUrlData.publicUrl);
       }
 
-      // Store uploaded URLs on element as JSON string
       fileInput.dataset.uploadedUrls = JSON.stringify(uploadedUrls);
 
       if (statusSpan) {
@@ -1251,14 +1249,34 @@
             const comp = completionMap.get(t.id);
             let line = `• ${t.title}`;
             if (comp.initials) line += ` [Initials: ${comp.initials}]`;
-            completedDetails.push(line);
 
             const urls = parsePhotoUrls(comp.photo_url);
+            
+            // Append photo URL directly to summary text block (guarantees display inside template summary box)
             if (urls.length > 0) {
-              const photoLinks = urls.map((u, i) => `<a href="${u}" target="_blank" style="color: #FF509F; text-decoration: underline; font-weight: bold; margin-right: 8px;">🖼️ View Photo ${urls.length > 1 ? i + 1 : ''}</a>`).join('');
+              urls.forEach((u, i) => {
+                const label = urls.length > 1 ? `Photo ${i + 1}` : 'Photo';
+                line += `\n    📸 ${label}: ${u}`;
+              });
+            }
+
+            completedDetails.push(line);
+
+            // Also build structured HTML gallery with links & image previews
+            if (urls.length > 0) {
+              const photoLinks = urls.map((u, i) => `
+                <div style="margin-top: 4px; margin-bottom: 8px;">
+                  <a href="${u}" target="_blank" style="color: #FF509F; font-weight: bold; text-decoration: underline;">
+                    🖼️ View Photo ${urls.length > 1 ? i + 1 : ''}
+                  </a>
+                  <br>
+                  <img src="${u}" alt="Task Photo" style="max-width: 100%; max-height: 220px; border-radius: 8px; margin-top: 4px; border: 1px solid #FF509F; display: block;" />
+                </div>
+              `).join('');
+
               photoElements.push(`
-                <div style="margin-bottom: 8px;">
-                  <strong style="color: #99C63E;">• ${t.title}:</strong><br>
+                <div style="margin-bottom: 12px; background: rgba(255,255,255,0.05); padding: 8px; border-radius: 6px;">
+                  <strong style="color: #99C63E;">• ${t.title}:</strong>
                   ${photoLinks}
                 </div>
               `);

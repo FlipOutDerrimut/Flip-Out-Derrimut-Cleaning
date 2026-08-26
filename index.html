@@ -411,6 +411,28 @@
       border-color: var(--flipout-green);
     }
 
+    /* Password Input Visibility Toggle Container */
+    .password-container {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .password-container input {
+      padding-right: 2.8rem;
+    }
+
+    .toggle-password-btn {
+      position: absolute;
+      right: 8px;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 1.1rem;
+      padding: 4px 8px;
+    }
+
     .days-grid {
       display: grid;
       grid-template-columns: repeat(7, 1fr);
@@ -602,7 +624,7 @@
     </div>
   </div>
 
-  <!-- 2. ADMIN LOGIN SCREEN -->
+  <!-- 2. ADMIN & WORKER LOGIN SCREEN -->
   <div id="admin-login-screen" class="container hidden">
     <div class="brand-header">
       <img src="FO Derrimut-01.png" alt="Flip Out Derrimut Logo" class="brand-logo" style="max-width: 180px;">
@@ -616,11 +638,18 @@
       </div>
       <div class="form-group">
         <label for="admin-password">Password</label>
-        <input type="password" id="admin-password" placeholder="••••••••" required />
+        <div class="password-container">
+          <input type="password" id="admin-password" placeholder="••••••••" required />
+          <button type="button" class="toggle-password-btn" onclick="togglePasswordVisibility('admin-password', this)">👁️</button>
+        </div>
       </div>
       <button type="submit" class="btn-primary">Authenticate</button>
       <div id="admin-error" class="error-message"></div>
     </form>
+
+    <div style="margin-top: 1rem; text-align: center;">
+      <button type="button" onclick="triggerWorkerPasswordReset()" class="admin-link" style="font-size: 0.75rem; color: var(--flipout-pink);">Forgot or Reset Password?</button>
+    </div>
 
     <div class="footer">
       <button id="back-to-app-btn-1" class="admin-link">← Return to Checklist Portal</button>
@@ -651,27 +680,63 @@
     </div>
 
     <div id="approval-queue-section" class="approval-window hidden">
-      <h3 style="margin-top: 0; margin-bottom: 0.5rem; font-size: 1.1rem; color: var(--warning);">📥 Pending Job Requests (Admin Approval)</h3>
-      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Review supervisor job submissions below. Click "Approve" to publish or "Reject" to discard.</p>
+      <h3 style="margin-top: 0; margin-bottom: 0.5rem; font-size: 1.1rem; color: var(--warning);">📥 Pending Permanent Job Requests (Admin Approval)</h3>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Review supervisor submissions below. Click "Approve" to publish permanently or "Reject" to discard.</p>
       <div id="approval-task-list"></div>
     </div>
 
-    <form id="create-user-form" class="admin-only hidden" style="margin-bottom: 2rem; background: var(--bg-card-alt); padding: 1.25rem; border-radius: 12px; border: 1px solid rgba(255,80,159,0.3);">
-      <h3 style="margin-top: 0; color: var(--flipout-pink); font-size: 1rem;">👤 Register New Supervisor Account</h3>
-      <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-        <div class="form-group" style="flex: 1; min-width: 200px;">
-          <label for="new-user-email">Supervisor Email</label>
-          <input type="email" id="new-user-email" placeholder="supervisor@flipout.com.au" required />
+    <!-- ADMIN USER MANAGEMENT PANEL -->
+    <div class="admin-only hidden" style="margin-bottom: 2rem; background: var(--bg-card-alt); padding: 1.25rem; border-radius: 12px; border: 1px solid rgba(255,80,159,0.3);">
+      <h3 style="margin-top: 0; color: var(--flipout-pink); font-size: 1rem;">👤 Account Management & Worker Password Reset</h3>
+      
+      <form id="create-user-form" style="margin-bottom: 1.25rem;">
+        <h4 style="margin: 0 0 0.5rem 0; font-size: 0.85rem; color: var(--text-muted);">Register New Supervisor Account</h4>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <div class="form-group" style="flex: 1; min-width: 200px; margin-bottom: 0.5rem;">
+            <label for="new-user-email">Supervisor Email</label>
+            <input type="email" id="new-user-email" placeholder="supervisor@flipout.com.au" required />
+          </div>
+          <div class="form-group" style="flex: 1; min-width: 200px; margin-bottom: 0.5rem;">
+            <label for="new-user-password">Temporary Password</label>
+            <div class="password-container">
+              <input type="password" id="new-user-password" placeholder="••••••••" required />
+              <button type="button" class="toggle-password-btn" onclick="togglePasswordVisibility('new-user-password', this)">👁️</button>
+            </div>
+          </div>
         </div>
-        <div class="form-group" style="flex: 1; min-width: 200px;">
-          <label for="new-user-password">Temporary Password</label>
-          <input type="password" id="new-user-password" placeholder="••••••••" required />
-        </div>
-      </div>
-      <button type="submit" class="btn-secondary" style="width: 100%;">Create Account</button>
-      <div id="create-user-msg"></div>
-    </form>
+        <button type="submit" class="btn-secondary" style="width: 100%; margin-top: 0.5rem;">Create Account</button>
+        <div id="create-user-msg"></div>
+      </form>
 
+      <div style="border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 1rem;">
+        <h4 style="margin: 0 0 0.5rem 0; font-size: 0.85rem; color: var(--text-muted);">Send Reset Password Instructions to Worker</h4>
+        <div style="display: flex; gap: 10px;">
+          <input type="email" id="admin-reset-target-email" placeholder="worker@flipout.com.au" style="flex: 1;" />
+          <button type="button" onclick="adminTriggerUserReset()" class="btn-secondary" style="white-space: nowrap;">Send Reset Email</button>
+        </div>
+        <div id="admin-reset-msg"></div>
+      </div>
+    </div>
+
+    <!-- WORKER SELF PASSWORD RESET PANEL -->
+    <div id="worker-self-account-section" style="margin-bottom: 2rem; background: var(--bg-card-alt); padding: 1.25rem; border-radius: 12px; border: 1px solid rgba(153,198,62,0.3);">
+      <h3 style="margin-top: 0; color: var(--flipout-green); font-size: 1rem;">🔐 Change My Password</h3>
+      <form id="change-my-password-form">
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <div class="form-group" style="flex: 1; min-width: 200px; margin-bottom: 0.5rem;">
+            <label for="self-new-password">New Password</label>
+            <div class="password-container">
+              <input type="password" id="self-new-password" placeholder="Minimum 6 characters" minlength="6" required />
+              <button type="button" class="toggle-password-btn" onclick="togglePasswordVisibility('self-new-password', this)">👁️</button>
+            </div>
+          </div>
+        </div>
+        <button type="submit" class="btn-secondary" style="width: 100%; margin-top: 0.5rem;">Update Password</button>
+        <div id="self-pwd-msg"></div>
+      </form>
+    </div>
+
+    <!-- TASK FORM -->
     <form id="task-form" style="margin-bottom: 2rem; background: var(--bg-input); padding: 1.25rem; border-radius: 12px; border: 1px solid rgba(153,198,62,0.2);">
       <input type="hidden" id="editing-task-id" value="" />
       <h3 id="form-heading" style="margin-top: 0; color: var(--flipout-green); font-size: 1.1rem;">Add Job</h3>
@@ -705,15 +770,15 @@
       </div>
 
       <div id="days-selector-group" class="form-group">
-        <label>Active Days</label>
+        <label>Active Days (Unchecked by default)</label>
         <div class="days-grid">
-          <label class="day-checkbox-label"><input type="checkbox" class="day-check" value="monday" checked> Mon</label>
-          <label class="day-checkbox-label"><input type="checkbox" class="day-check" value="tuesday" checked> Tue</label>
-          <label class="day-checkbox-label"><input type="checkbox" class="day-check" value="wednesday" checked> Wed</label>
-          <label class="day-checkbox-label"><input type="checkbox" class="day-check" value="thursday" checked> Thu</label>
-          <label class="day-checkbox-label"><input type="checkbox" class="day-check" value="friday" checked> Fri</label>
-          <label class="day-checkbox-label"><input type="checkbox" class="day-check" value="saturday" checked> Sat</label>
-          <label class="day-checkbox-label"><input type="checkbox" class="day-check" value="sunday" checked> Sun</label>
+          <label class="day-checkbox-label"><input type="checkbox" class="day-check" value="monday"> Mon</label>
+          <label class="day-checkbox-label"><input type="checkbox" class="day-check" value="tuesday"> Tue</label>
+          <label class="day-checkbox-label"><input type="checkbox" class="day-check" value="wednesday"> Wed</label>
+          <label class="day-checkbox-label"><input type="checkbox" class="day-check" value="thursday"> Thu</label>
+          <label class="day-checkbox-label"><input type="checkbox" class="day-check" value="friday"> Fri</label>
+          <label class="day-checkbox-label"><input type="checkbox" class="day-check" value="saturday"> Sat</label>
+          <label class="day-checkbox-label"><input type="checkbox" class="day-check" value="sunday"> Sun</label>
         </div>
       </div>
 
@@ -724,13 +789,12 @@
         <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.9rem;">
           <input type="checkbox" id="new-task-initials" checked style="width: auto;"> Requires Initials
         </label>
-        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.9rem; color: var(--warning);">
-          <input type="checkbox" id="new-task-temporary" style="width: auto;"> Temporary Job (Today Only)
-        </label>
       </div>
 
-      <div style="display: flex; gap: 10px;">
-        <button type="submit" id="submit-task-btn" class="btn-primary">+ Submit Job</button>
+      <!-- BUTTON ACTIONS ADJUSTED ACCORDING TO USER ROLE -->
+      <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <button type="button" id="submit-temp-task-btn" onclick="handleTaskFormSubmit(true)" class="btn-primary" style="flex: 1;">+ Add Temporary Job (Today Only)</button>
+        <button type="button" id="submit-perm-task-btn" onclick="handleTaskFormSubmit(false)" class="btn-secondary" style="flex: 1;">📩 Send Request for Permanent Job</button>
         <button type="button" id="cancel-edit-btn" class="btn-danger hidden">Cancel Edit</button>
       </div>
     </form>
@@ -806,6 +870,18 @@
     const mainDayTabs = document.querySelectorAll('.main-day-tab');
     const adminFilterTabs = document.querySelectorAll('.admin-filter-tab');
 
+    // Password Visibility Toggle Function
+    window.togglePasswordVisibility = function(inputId, btnEl) {
+      const input = document.getElementById(inputId);
+      if (input.type === 'password') {
+        input.type = 'text';
+        btnEl.textContent = '🙈';
+      } else {
+        input.type = 'password';
+        btnEl.textContent = '👁️';
+      }
+    };
+
     const messageComponents = {
       openers: [
         "Legendary work!", "Flip-tastic job!", "Unreal effort!", "Boom!", "Sensational effort!",
@@ -872,9 +948,18 @@
     async function initialiseApp() {
       selectDay(currentSelectedDay);
       checkSession();
+
+      // Background Auto-Refresh Polling (15s Interval for Live Sync on iPad Kiosk)
+      setInterval(() => {
+        if (!mainApp.classList.contains('hidden')) {
+          selectDay(currentSelectedDay, true);
+        } else if (!backOfficeScreen.classList.contains('hidden')) {
+          loadAdminTasks(true);
+        }
+      }, 15000);
     }
 
-    async function selectDay(dayName) {
+    async function selectDay(dayName, isSilentRefresh = false) {
       currentSelectedDay = dayName;
       currentSelectedDateISO = getDateForDayOfWeek(dayName);
       
@@ -885,8 +970,9 @@
       const isToday = days[new Date().getDay()] === dayName;
       document.getElementById('active-day-title').textContent = `${dayName.toUpperCase()} ${isToday ? '(Today)' : ''}`;
 
-      pendingTasksContainer.innerHTML = `<p style="text-align: center; color: var(--text-muted);">Loading tasks...</p>`;
-      completedTasksContainer.innerHTML = '';
+      if (!isSilentRefresh) {
+        pendingTasksContainer.innerHTML = `<p style="text-align: center; color: var(--text-muted);">Loading tasks...</p>`;
+      }
 
       const { data: completions } = await supabaseClient
         .from('task_completions')
@@ -903,7 +989,7 @@
         .order('sort_order', { ascending: true });
 
       if (error) {
-        pendingTasksContainer.innerHTML = `<p class="error-message">Error loading tasks: ${error.message}</p>`;
+        if (!isSilentRefresh) pendingTasksContainer.innerHTML = `<p class="error-message">Error loading tasks: ${error.message}</p>`;
         return;
       }
 
@@ -1001,50 +1087,20 @@
       return publicUrlData.publicUrl;
     };
 
-    function isTaskValid(taskId) {
-      const initialsInput = document.getElementById(`initials-${taskId}`);
-      const initials = initialsInput ? initialsInput.value.trim() : '';
-      const photoInput = document.getElementById(`photos-${taskId}`);
-      const photoUrl = photoInput ? (photoInput.dataset.uploadedUrl || null) : null;
-
-      const hasInitials = initialsInput ? initials.length > 0 : true;
-      const hasPhotos = photoInput ? Boolean(photoUrl) : true;
-
-      return {
-        isValid: hasInitials && hasPhotos,
-        missingInitials: initialsInput && !hasInitials,
-        missingPhoto: photoInput && !hasPhotos,
-        initials: initials,
-        photoUrl: photoUrl
-      };
-    }
-
-    // Toggle Completion with Auto-EOD Trigger Evaluation
     window.toggleTaskComplete = async function(taskId, isChecking) {
       const checkbox = document.getElementById(`task-${taskId}`);
 
       if (isChecking) {
-        const validation = isTaskValid(taskId);
-
-        if (validation.missingInitials) {
-          alert('⚠️ Mandatory: Please enter your initials before completing this task.');
-          if (checkbox) checkbox.checked = false;
-          const initialsInput = document.getElementById(`initials-${taskId}`);
-          if (initialsInput) initialsInput.focus();
-          return;
-        }
-
-        if (validation.missingPhoto) {
-          alert('⚠️ Mandatory: Please upload the required photo(s) before completing this task.');
-          if (checkbox) checkbox.checked = false;
-          return;
-        }
+        const initialsInput = document.getElementById(`initials-${taskId}`);
+        const initials = initialsInput ? initialsInput.value.trim() : '';
+        const photoInput = document.getElementById(`photos-${taskId}`);
+        const photoUrl = photoInput ? (photoInput.dataset.uploadedUrl || null) : null;
 
         const { error } = await supabaseClient.from('task_completions').insert([{
           task_id: taskId,
           completed_date: currentSelectedDateISO,
-          initials: validation.initials,
-          photo_url: validation.photoUrl
+          initials: initials,
+          photo_url: photoUrl
         }]);
 
         if (error) {
@@ -1073,7 +1129,6 @@
       }
     };
 
-    // Automated Check Strategy for 100% Task Completion
     async function checkAndAutoSendEOD() {
       const autoSentKey = `eod_sent_${currentSelectedDateISO}`;
       if (localStorage.getItem(autoSentKey)) return;
@@ -1095,7 +1150,6 @@
       }
     }
 
-    // Enhanced EOD Summary Email Sender with Photo Link Payload
     window.sendEODSummaryEmail = async function(isAutomated = false) {
       if (!isAutomated && !confirm(`Send the End of Day summary report for ${currentSelectedDay.toUpperCase()} (${currentSelectedDateISO})?`)) return;
 
@@ -1195,11 +1249,11 @@
       a.click();
     };
 
-    async function loadAdminTasks() {
+    async function loadAdminTasks(isSilent = false) {
       const { data: tasks, error } = await supabaseClient.from('tasks').select('*').order('sort_order', { ascending: true });
       
       if (error || !tasks) {
-        adminTaskList.innerHTML = `<p class="error-message">Could not load tasks.</p>`;
+        if (!isSilent) adminTaskList.innerHTML = `<p class="error-message">Could not load tasks.</p>`;
         return;
       }
 
@@ -1310,14 +1364,13 @@
       document.getElementById('new-task-photos-count').value = task.max_photos || 1;
       document.getElementById('new-task-photo').checked = task.requires_photo;
       document.getElementById('new-task-initials').checked = task.requires_initials;
-      document.getElementById('new-task-temporary').checked = task.is_temporary || false;
 
       document.querySelectorAll('.day-check').forEach(cb => {
         cb.checked = (task.days || []).includes(cb.value);
       });
 
       document.getElementById('form-heading').textContent = 'Edit Task';
-      document.getElementById('submit-task-btn').textContent = '✓ Update Task';
+      document.getElementById('submit-temp-task-btn').textContent = '✓ Update Task';
       document.getElementById('cancel-edit-btn').classList.remove('hidden');
 
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1330,27 +1383,48 @@
       document.getElementById('new-task-photos-count').value = '1';
       document.getElementById('new-task-photo').checked = false;
       document.getElementById('new-task-initials').checked = true;
-      document.getElementById('new-task-temporary').checked = false;
-      document.querySelectorAll('.day-check').forEach(cb => cb.checked = true);
+      
+      // Default Active Days completely unselected when adding a job
+      document.querySelectorAll('.day-check').forEach(cb => cb.checked = false);
 
       document.getElementById('form-heading').textContent = 'Add Job';
-      document.getElementById('submit-task-btn').textContent = '+ Submit Job';
+      updateTaskFormButtons();
       document.getElementById('cancel-edit-btn').classList.add('hidden');
+    }
+
+    function updateTaskFormButtons() {
+      const tempBtn = document.getElementById('submit-temp-task-btn');
+      const permBtn = document.getElementById('submit-perm-task-btn');
+
+      if (currentUserRole === 'admin') {
+        tempBtn.textContent = '+ Add Temporary Job (Today)';
+        permBtn.textContent = '+ Add Permanent Job Directly';
+        permBtn.classList.remove('hidden');
+      } else {
+        tempBtn.textContent = '+ Add Temporary Job (Today Only)';
+        permBtn.textContent = '📩 Send Request for Permanent Job';
+        permBtn.classList.remove('hidden');
+      }
     }
 
     document.getElementById('cancel-edit-btn').addEventListener('click', resetTaskForm);
 
-    document.getElementById('task-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
+    // FLIPPED SUBMISSION HANDLER: Main button adds temporary job, secondary sends permanent job for admin approval
+    window.handleTaskFormSubmit = async function(isTemporaryJobRequested) {
+      const title = document.getElementById('new-task-title').value.trim();
+      if (!title) {
+        alert('Please enter a task description.');
+        return;
+      }
+
       const editingId = document.getElementById('editing-task-id').value;
-      const title = document.getElementById('new-task-title').value;
       const category = document.getElementById('new-task-category').value;
       const max_photos = parseInt(document.getElementById('new-task-photos-count').value);
       const requires_photo = document.getElementById('new-task-photo').checked;
       const requires_initials = document.getElementById('new-task-initials').checked;
-      const is_temporary = document.getElementById('new-task-temporary').checked;
       const selectedDays = Array.from(document.querySelectorAll('.day-check:checked')).map(cb => cb.value);
 
+      const is_temporary = isTemporaryJobRequested;
       const is_approved = (currentUserRole === 'admin') || is_temporary;
 
       let result;
@@ -1369,10 +1443,10 @@
 
       if (!result.error) {
         if (!is_approved) {
-          alert('✓ Job request submitted! An admin will review it shortly.');
+          alert('✓ Permanent job request submitted! An admin will review and approve it shortly.');
           notifyAdminViaEmail(title);
         } else {
-          alert('✓ Job saved successfully!');
+          alert(`✓ ${is_temporary ? 'Temporary job for today' : 'Job'} added successfully!`);
         }
         resetTaskForm();
         loadAdminTasks();
@@ -1380,7 +1454,7 @@
       } else {
         alert('Error saving task: ' + result.error.message);
       }
-    });
+    };
 
     function notifyAdminViaEmail(jobTitle) {
       if (typeof emailjs !== 'undefined' && EMAILJS_PUBLIC_KEY !== 'YOUR_EMAILJS_PUBLIC_KEY') {
@@ -1391,6 +1465,7 @@
       }
     }
 
+    // Account Creation & Admin Reset Tools
     document.getElementById('create-user-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const email = document.getElementById('new-user-email').value;
@@ -1403,9 +1478,7 @@
       const { data, error } = await supabaseClient.auth.signUp({
         email: email,
         password: password,
-        options: {
-          data: { role: 'supervisor' }
-        }
+        options: { data: { role: 'supervisor' } }
       });
 
       if (error) {
@@ -1418,6 +1491,69 @@
         document.getElementById('new-user-password').value = '';
       }
     });
+
+    // Admin Password Reset Trigger
+    window.adminTriggerUserReset = async function() {
+      const email = document.getElementById('admin-reset-target-email').value.trim();
+      const msgDiv = document.getElementById('admin-reset-msg');
+      
+      if (!email) {
+        alert('Please enter a valid worker email address.');
+        return;
+      }
+
+      msgDiv.className = '';
+      msgDiv.textContent = 'Sending password reset link...';
+
+      const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.href
+      });
+
+      if (error) {
+        msgDiv.className = 'error-message';
+        msgDiv.textContent = 'Failed: ' + error.message;
+      } else {
+        msgDiv.className = 'success-message';
+        msgDiv.textContent = `✓ Password reset link sent to ${email}!`;
+        document.getElementById('admin-reset-target-email').value = '';
+      }
+    };
+
+    // Worker Self Password Reset
+    document.getElementById('change-my-password-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const newPassword = document.getElementById('self-new-password').value;
+      const msgDiv = document.getElementById('self-pwd-msg');
+
+      msgDiv.className = '';
+      msgDiv.textContent = 'Updating password...';
+
+      const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
+
+      if (error) {
+        msgDiv.className = 'error-message';
+        msgDiv.textContent = 'Error: ' + error.message;
+      } else {
+        msgDiv.className = 'success-message';
+        msgDiv.textContent = '✓ Your password has been successfully updated!';
+        document.getElementById('self-new-password').value = '';
+      }
+    });
+
+    // Login Screen Worker Reset Trigger
+    window.triggerWorkerPasswordReset = async function() {
+      const email = prompt('Enter your registered email address to receive a password reset link:');
+      if (email && email.trim()) {
+        const { error } = await supabaseClient.auth.resetPasswordForEmail(email.trim(), {
+          redirectTo: window.location.href
+        });
+        if (error) {
+          alert('Error: ' + error.message);
+        } else {
+          alert(`✓ Password reset instructions have been emailed to ${email}.`);
+        }
+      }
+    };
 
     window.deleteTask = async function(id) {
       if (confirm('Are you sure you want to remove this job?')) {
@@ -1463,6 +1599,8 @@
 
       const roleBadge = document.getElementById('user-role-tag');
       roleBadge.textContent = role;
+
+      updateTaskFormButtons();
 
       if (role === 'admin') {
         document.querySelectorAll('.admin-only').forEach(el => el.classList.remove('hidden'));

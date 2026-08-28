@@ -1795,73 +1795,145 @@
       calculateEODTotals();
     }
 
-    async function handleEODReportSubmit(e) {
-      e.preventDefault();
-      dismissKeyboard();
-      const msgDiv = document.getElementById('eod-submit-msg');
-      msgDiv.className = '';
-      msgDiv.textContent = 'Submitting End of Day Report & Sending Email...';
+ async function handleEODReportSubmit(e) {
+  e.preventDefault();
+  dismissKeyboard();
+  const msgDiv = document.getElementById('eod-submit-msg');
+  msgDiv.className = '';
+  msgDiv.textContent = 'Submitting End of Day Report & Sending Email...';
 
-      const reportData = {
-        date: document.getElementById('eod-date').value,
-        day: document.getElementById('eod-day').value,
-        staff: document.getElementById('eod-staff').value.trim(),
-        float: '$300.00',
-        takings: parseFloat(document.getElementById('eod-takings-input').value) || 0,
-        eod_takings: parseFloat(document.getElementById('eod-eod-takings-input').value) || 0,
-        total_cash: document.getElementById('eod-total-cash-1').value,
-        eftpos_1: parseFloat(document.getElementById('eod-eftpos-1').value) || 0,
-        eftpos_2: parseFloat(document.getElementById('eod-eftpos-2').value) || 0,
-        total_eftpos: document.getElementById('eod-total-eftpos').value,
-        online_booking: parseFloat(document.getElementById('eod-online-booking').value) || 0,
-        bank_transfer: parseFloat(document.getElementById('eod-bank-transfer').value) || 0,
-        grand_total: document.getElementById('eod-grand-total-input').value
+  const reportData = {
+    date: document.getElementById('eod-date').value,
+    day: document.getElementById('eod-day').value,
+    staff: document.getElementById('eod-staff').value.trim(),
+    float: '$300.00',
+    takings: parseFloat(document.getElementById('eod-takings-input').value) || 0,
+    eod_takings: parseFloat(document.getElementById('eod-eod-takings-input').value) || 0,
+    total_cash: document.getElementById('eod-total-cash-1').value,
+    eftpos_1: parseFloat(document.getElementById('eod-eftpos-1').value) || 0,
+    eftpos_2: parseFloat(document.getElementById('eod-eftpos-2').value) || 0,
+    total_eftpos: document.getElementById('eod-total-eftpos').value,
+    online_booking: parseFloat(document.getElementById('eod-online-booking').value) || 0,
+    bank_transfer: parseFloat(document.getElementById('eod-bank-transfer').value) || 0,
+    grand_total: document.getElementById('eod-grand-total-input').value
+  };
+
+  try {
+    // 1. Save EOD Financial Report to Supabase
+    const { error } = await supabaseClient
+      .from('eod_reports')
+      .insert([reportData]);
+
+    if (error) {
+      console.warn('Supabase DB Insert Note:', error.message);
+    }
+
+    // 2. Fetch Checklist Data for the Email
+    const { data: completions } = await supabaseClient
+      .from('task_completions')
+      .select('task_id, initials, photo_url')
+      .eq('completed_date', currentSelectedDateISO);
+
+    const { data: tasks } = await supabaseClient
+      .from('tasks')
+      .select('*')
+      .eq('is_approved', true)
+      .or(`days.cs.{${currentSelectedDay}},and(is_temporary.eq.true,created_for_date.eq.${currentSelectedDateISO})`)
+      .order('sort_order', { ascending: true });
+
+    const validTasks = (tasks || []).filter(t => !t.is_temporary || t.created_for_date === currentSelectedDateISO);
+    const completionMap = new Map();
+    (completions || []).forEach(c => completionMap.set(c.task_id, c));
+
+    let completedCount = 0;
+    const completedDetailsText = [];
+    const photoElements = [];
+
+    validTasks.forEach(t => {
+      if (completionMap.has(t.id)) {
+        completedCount++;
+        const comp = completionMap.get(t.id);
+        const initialsText = comp.initials ? comp.initials : 'N/A';
+        const urls = parsePhotoUrls(comp.photo_url);
+
+        // Format for plain text list in email
+        let textLine = `• ${t.title} [Initials: ${initialsText}]`;
+        if (urls.length > 0) {
+          urls.forEach((u, i) => {
+            textLine += `\n   📸 Photo ${urls.length > 1 ? i + 1 : ''}: ${u}`;
+          });
+        }
+        completedDetailsText.push(textLine);
+
+        // Format for HTML Photo Gallery
+        if (urls.length > 0) {
+          const photoLinks = urls.map((u, i) => `
+            <div style="margin-top: 6px; margin-bottom: 10px;">
+              <a href="${u}" target="_blank" style="color: #FF509F; font-weight: bold; text-decoration: underline;">
+                🖼️ View High Res Photo ${urls.length > 1 ? i + 1 : ''}
+              </a><br>
+              <img src="${u}" alt="Task Photo" style="max-width: 100%; max-height: 250px; border-radius: 8px; margin-top: 4px; border: 2px solid #FF509F; display: block;" />
+            </div>
+          `).join('');
+
+          photoElements.push(`
+            <div style="margin-bottom: 14px; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; border-left: 4px solid #99C63E;">
+              <strong style="color: #99C63E; font-size: 1.05em;">• ${t.title} (Initials: ${initialsText}):</strong>
+              ${photoLinks}
+            </div>
+          `);
+        }
+      }
+    });
+
+    const totalCount = validTasks.length;
+    const ratePercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+    const summaryDetailsText = completedDetailsText.length > 0 ? completedDetailsText.join('\n\n') : 'No completed tasks recorded today.';
+    const photoGalleryHtml = photoElements.length > 0 ? photoElements.join('') : '<span style="color: #A0A0A0;">No photos uploaded today.</span>';
+
+    // 3. Dispatch Merged EOD Report Email via EmailJS
+    if (typeof emailjs !== 'undefined' && EMAILJS_PUBLIC_KEY !== 'YOUR_EMAILJS_PUBLIC_KEY') {
+      const templateParams = {
+        // General & Financial Mapping
+        day: reportData.day,
+        report_date: reportData.date,
+        staff_members: reportData.staff,
+        rec1_float: reportData.float,
+        rec1_takings: `$${reportData.takings.toFixed(2)}`,
+        rec1_eod_takings: `$${reportData.eod_takings.toFixed(2)}`,
+        rec1_total_cash: reportData.total_cash,
+        rec1_eftpos: `$${reportData.eftpos_1.toFixed(2)}`,
+        rec2_eftpos: `$${reportData.eftpos_2.toFixed(2)}`,
+        total_eftpos: reportData.total_eftpos,
+        total_cash: reportData.total_cash,
+        online_booking: `$${reportData.online_booking.toFixed(2)}`,
+        bank_transfer: `$${reportData.bank_transfer.toFixed(2)}`,
+        grand_total: reportData.grand_total,
+        
+        // Checklist & Operation Mapping
+        completion_rate: `${ratePercent}%`,
+        completed_count: completedCount,
+        total_count: totalCount,
+        summary_details: summaryDetailsText,
+        photo_gallery: photoGalleryHtml
       };
 
-      try {
-        // Save EOD Report to Supabase
-        const { error } = await supabaseClient
-          .from('eod_reports')
-          .insert([reportData]);
-
-        if (error) {
-          console.warn('Supabase DB Insert Note:', error.message);
-        }
-
-        // Dispatch EOD Report Email via EmailJS
-        if (typeof emailjs !== 'undefined' && EMAILJS_PUBLIC_KEY !== 'YOUR_EMAILJS_PUBLIC_KEY') {
-          const templateParams = {
-            report_date: reportData.date,
-            report_day: reportData.day,
-            staff: reportData.staff,
-            float_amount: reportData.float,
-            takings: `$${reportData.takings.toFixed(2)}`,
-            eod_takings: `$${reportData.eod_takings.toFixed(2)}`,
-            total_cash: reportData.total_cash,
-            eftpos_1: `$${reportData.eftpos_1.toFixed(2)}`,
-            eftpos_2: `$${reportData.eftpos_2.toFixed(2)}`,
-            total_eftpos: reportData.total_eftpos,
-            online_booking: `$${reportData.online_booking.toFixed(2)}`,
-            bank_transfer: `$${reportData.bank_transfer.toFixed(2)}`,
-            grand_total: reportData.grand_total
-          };
-
-          await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_EOD_TEMPLATE_ID, templateParams);
-        }
-
-        msgDiv.className = 'success-message';
-        msgDiv.textContent = '✓ End of Day Report submitted & email dispatched successfully!';
-        alert(`✓ EOD Report Submitted & Email Sent!\n\nDate: ${reportData.date}\nStaff: ${reportData.staff}\nTotal: ${reportData.grand_total}`);
-        
-        setTimeout(() => {
-          showMainApp();
-        }, 1200);
-
-      } catch (err) {
-        msgDiv.className = 'error-message';
-        msgDiv.textContent = 'Submission error: ' + (err.text || err.message || err);
-      }
+      await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_EOD_TEMPLATE_ID, templateParams);
     }
+
+    msgDiv.className = 'success-message';
+    msgDiv.textContent = '✓ End of Day Report submitted & email dispatched successfully!';
+    alert(`✓ EOD Report Submitted & Email Sent!\n\nDate: ${reportData.date}\nStaff: ${reportData.staff}\nTotal: ${reportData.grand_total}`);
+    
+    setTimeout(() => {
+      showMainApp();
+    }, 1200);
+
+  } catch (err) {
+    msgDiv.className = 'error-message';
+    msgDiv.textContent = 'Submission error: ' + (err.text || err.message || err);
+  }
+}
 
     async function selectDay(dayName, isSilentRefresh = false) {
       dismissKeyboard();

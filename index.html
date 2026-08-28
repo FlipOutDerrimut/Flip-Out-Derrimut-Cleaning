@@ -121,6 +121,30 @@
       opacity: 0.9;
     }
 
+    .hard-refresh-btn-top {
+      position: absolute;
+      top: 0px;
+      left: 0px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      color: var(--text-light);
+      padding: 0.4rem 0.7rem;
+      border-radius: 8px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.2s ease;
+      z-index: 10;
+    }
+
+    .hard-refresh-btn-top:hover {
+      background: var(--flipout-pink);
+      border-color: var(--flipout-pink);
+    }
+
     .progress-wrapper {
       margin-bottom: 1.5rem;
       background: var(--bg-input);
@@ -595,6 +619,7 @@
   <!-- 1. STAFF CHECKLIST VIEW -->
   <div id="main-app" class="container">
     <div class="brand-header">
+      <button onclick="hardRefreshApp()" class="hard-refresh-btn-top">🔄 Hard Refresh</button>
       <img src="FO Derrimut-01.png" alt="Flip Out Derrimut Logo" class="brand-logo">
       <div class="sub-title">Daily Operations Checklist</div>
       <img src="14.png" alt="Jet and Max Ninjas" class="mascot-hero-right">
@@ -639,6 +664,9 @@
       <button id="send-eod-main-btn" onclick="sendEODSummaryEmail(false)" class="btn-secondary" style="font-size: 0.8rem;">
         ✉️ Dispatch EOD Email
       </button>
+      <button onclick="hardRefreshApp()" class="btn-secondary" style="font-size: 0.8rem;">
+        🔄 Refresh
+      </button>
       <button id="show-admin-login-btn" class="admin-link">Back Office Access</button>
     </div>
   </div>
@@ -646,6 +674,7 @@
   <!-- 2. ADMIN & WORKER LOGIN SCREEN -->
   <div id="admin-login-screen" class="container hidden">
     <div class="brand-header">
+      <button onclick="hardRefreshApp()" class="hard-refresh-btn-top">🔄 Hard Refresh</button>
       <img src="FO Derrimut-01.png" alt="Flip Out Derrimut Logo" class="brand-logo" style="max-width: 180px;">
       <div class="sub-title">Staff & Supervisor Login</div>
     </div>
@@ -688,6 +717,7 @@
       <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
         <span id="user-role-tag" class="role-badge">Supervisor</span>
         <div style="display: flex; gap: 6px;">
+          <button onclick="hardRefreshApp()" class="btn-secondary">🔄 Refresh</button>
           <button id="send-eod-btn" onclick="sendEODSummaryEmail(false)" class="btn-secondary">
             ✉️ EOD Report
           </button>
@@ -869,11 +899,93 @@
     }
 
     const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-    let currentSelectedDay = days[new Date().getDay()];
-    let currentSelectedDateISO = new Date().toISOString().split('T')[0];
+    
+    // MELBOURNE TIME ZONE HELPER FUNCTIONS
+    function getMelbourneTodayISO() {
+      // Formats current date strictly in Australia/Melbourne timezone as YYYY-MM-DD
+      return new Date().toLocaleDateString('en-CA', { timeZone: 'Australia/Melbourne' });
+    }
+
+    function getMelbourneDayName() {
+      return new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Australia/Melbourne' }).toLowerCase();
+    }
+
+    function getDateForDayOfWeek(dayName) {
+      const dayMap = { 'sunday': 0, 'monday': 1, 'tuesday': 2, 'wednesday': 3, 'thursday': 4, 'friday': 5, 'saturday': 6 };
+      const targetDayIndex = dayMap[dayName.toLowerCase()];
+      
+      const melbTodayStr = getMelbourneTodayISO();
+      const [year, month, day] = melbTodayStr.split('-').map(Number);
+      const melbTodayObj = new Date(year, month - 1, day);
+      const currentDayIndex = melbTodayObj.getDay();
+
+      const diff = targetDayIndex - currentDayIndex;
+      const targetDate = new Date(melbTodayObj);
+      targetDate.setDate(melbTodayObj.getDate() + diff);
+
+      const y = targetDate.getFullYear();
+      const m = String(targetDate.getMonth() + 1).padStart(2, '0');
+      const d = String(targetDate.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+
+    let currentSelectedDay = getMelbourneDayName();
+    let currentSelectedDateISO = getMelbourneTodayISO();
     let allLoadedTasks = [];
     let activeAdminFilter = 'all';
     let currentUserRole = 'supervisor';
+
+    // 15-MINUTE AUTO SIGN OUT INACTIVITY TIMER FOR BACK OFFICE
+    let backOfficeInactivityTimer = null;
+    const INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000; // 15 Minutes
+
+    function resetInactivityTimer() {
+      if (backOfficeInactivityTimer) clearTimeout(backOfficeInactivityTimer);
+      if (!backOfficeScreen.classList.contains('hidden')) {
+        backOfficeInactivityTimer = setTimeout(autoSignOutBackOffice, INACTIVITY_TIMEOUT_MS);
+      }
+    }
+
+    async function autoSignOutBackOffice() {
+      if (!backOfficeScreen.classList.contains('hidden')) {
+        await supabaseClient.auth.signOut();
+        alert('You have been automatically signed out of Back Office due to 15 minutes of inactivity.');
+        showMainApp();
+      }
+    }
+
+    // Attach activity listeners to reset inactivity timer
+    ['mousemove', 'keydown', 'touchstart', 'click', 'scroll'].forEach(eventType => {
+      window.addEventListener(eventType, () => {
+        if (!backOfficeScreen.classList.contains('hidden')) {
+          resetInactivityTimer();
+        }
+      }, { passive: true });
+    });
+
+    // HARD REFRESH BUTTON FUNCTION
+    window.hardRefreshApp = function() {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(registrations => {
+          for (let registration of registrations) {
+            registration.unregister();
+          }
+        });
+      }
+      if (window.caches) {
+        caches.keys().then(names => {
+          for (let name of names) caches.delete(name);
+        });
+      }
+      window.location.reload(true);
+    };
+
+    // KEYBOARD RETRACTION HELPER
+    function dismissKeyboard() {
+      if (document.activeElement && typeof document.activeElement.blur === 'function') {
+        document.activeElement.blur();
+      }
+    }
 
     // DOM Elements
     const mainApp = document.getElementById('main-app');
@@ -964,25 +1076,18 @@
       document.getElementById('reward-modal').classList.add('hidden');
     }
 
-    function getDateForDayOfWeek(dayName) {
-      const dayMap = { 'sunday': 0, 'monday': 1, 'tuesday': 2, 'wednesday': 3, 'thursday': 4, 'friday': 5, 'saturday': 6 };
-      const targetDayIndex = dayMap[dayName.toLowerCase()];
-      const now = new Date();
-      const currentDayIndex = now.getDay();
-      
-      const diff = targetDayIndex - currentDayIndex;
-      const targetDate = new Date(now);
-      targetDate.setDate(now.getDate() + diff);
-      
-      return targetDate.toISOString().split('T')[0];
-    }
-
     async function initialiseApp() {
       selectDay(currentSelectedDay);
       checkSession();
 
       // Background Auto-Refresh Polling
       setInterval(() => {
+        // Auto-check for Melbourne midnight date shift
+        const melbToday = getMelbourneTodayISO();
+        if (currentSelectedDay === getMelbourneDayName() && currentSelectedDateISO !== melbToday) {
+          currentSelectedDateISO = melbToday;
+        }
+
         if (!mainApp.classList.contains('hidden')) {
           selectDay(currentSelectedDay, true);
         } else if (!backOfficeScreen.classList.contains('hidden')) {
@@ -992,6 +1097,7 @@
     }
 
     async function selectDay(dayName, isSilentRefresh = false) {
+      dismissKeyboard();
       currentSelectedDay = dayName;
       currentSelectedDateISO = getDateForDayOfWeek(dayName);
       
@@ -999,13 +1105,14 @@
         tab.classList.toggle('active', tab.dataset.day === dayName);
       });
 
-      const isToday = days[new Date().getDay()] === dayName;
+      const isToday = getMelbourneDayName() === dayName;
       document.getElementById('active-day-title').textContent = `${dayName.toUpperCase()} ${isToday ? '(Today)' : ''}`;
 
       if (!isSilentRefresh) {
         pendingTasksContainer.innerHTML = `<p style="text-align: center; color: var(--text-muted);">Loading tasks...</p>`;
       }
 
+      // Fetch task completions strictly for target date
       const { data: completions } = await supabaseClient
         .from('task_completions')
         .select('task_id, initials, photo_url')
@@ -1028,7 +1135,15 @@
         return;
       }
 
-      if (!tasks || tasks.length === 0) {
+      // STRICT FILTERING: Temporary tasks MUST only display on their exact creation date
+      const validTasks = (tasks || []).filter(task => {
+        if (task.is_temporary) {
+          return task.created_for_date === currentSelectedDateISO;
+        }
+        return true;
+      });
+
+      if (validTasks.length === 0) {
         pendingTasksContainer.innerHTML = `<p style="text-align: center; color: var(--text-muted);">No tasks assigned for ${dayName}.</p>`;
         updateProgressBar(0, 0);
         completedSection.classList.add('hidden');
@@ -1038,7 +1153,7 @@
       const pendingList = [];
       const completedList = [];
 
-      tasks.forEach(task => {
+      validTasks.forEach(task => {
         const completionData = completionMap.get(task.id);
         const isDone = !!completionData;
         const photoUrl = completionData ? completionData.photo_url : null;
@@ -1061,7 +1176,7 @@
         completedSection.classList.add('hidden');
       }
 
-      updateProgressBar(completedList.length, tasks.length);
+      updateProgressBar(completedList.length, validTasks.length);
     }
 
     function renderTaskCard(task, isDone, savedPhotoUrl = null, savedInitials = '') {
@@ -1105,6 +1220,7 @@
     }
 
     window.handleTaskPhotoSelect = async function(fileInput, taskId, maxPhotos = 1) {
+      dismissKeyboard();
       const files = Array.from(fileInput.files);
       if (!files || files.length === 0) return;
 
@@ -1154,6 +1270,7 @@
     };
 
     window.toggleTaskComplete = async function(taskId, isChecking) {
+      dismissKeyboard();
       const checkbox = document.getElementById(`task-${taskId}`);
 
       if (isChecking) {
@@ -1205,22 +1322,25 @@
 
       const { data: dayTasks } = await supabaseClient
         .from('tasks')
-        .select('id')
+        .select('id, is_temporary, created_for_date')
         .eq('is_approved', true)
         .or(`days.cs.{${currentSelectedDay}},and(is_temporary.eq.true,created_for_date.eq.${currentSelectedDateISO})`);
+
+      const validDayTasks = (dayTasks || []).filter(t => !t.is_temporary || t.created_for_date === currentSelectedDateISO);
 
       const { data: dayCompletions } = await supabaseClient
         .from('task_completions')
         .select('task_id')
         .eq('completed_date', currentSelectedDateISO);
 
-      if (dayTasks && dayCompletions && dayTasks.length > 0 && dayCompletions.length >= dayTasks.length) {
+      if (validDayTasks && dayCompletions && validDayTasks.length > 0 && dayCompletions.length >= validDayTasks.length) {
         localStorage.setItem(autoSentKey, 'true');
         await sendEODSummaryEmail(true);
       }
     }
 
     window.sendEODSummaryEmail = async function(isAutomated = false) {
+      dismissKeyboard();
       if (!isAutomated && !confirm(`Send EOD summary report for ${currentSelectedDay.toUpperCase()} (${currentSelectedDateISO})?`)) return;
 
       try {
@@ -1238,13 +1358,15 @@
 
         if (error) return alert('Failed to fetch tasks: ' + error.message);
 
+        const validTasks = (tasks || []).filter(t => !t.is_temporary || t.created_for_date === currentSelectedDateISO);
+
         const completionMap = new Map();
         (completions || []).forEach(c => completionMap.set(c.task_id, c));
 
         const completedDetails = [];
         const photoElements = [];
 
-        (tasks || []).forEach(t => {
+        validTasks.forEach(t => {
           if (completionMap.has(t.id)) {
             const comp = completionMap.get(t.id);
             let line = `• ${t.title}`;
@@ -1252,7 +1374,6 @@
 
             const urls = parsePhotoUrls(comp.photo_url);
             
-            // Append photo URL directly to summary text block (guarantees display inside template summary box)
             if (urls.length > 0) {
               urls.forEach((u, i) => {
                 const label = urls.length > 1 ? `Photo ${i + 1}` : 'Photo';
@@ -1262,7 +1383,6 @@
 
             completedDetails.push(line);
 
-            // Also build structured HTML gallery with links & image previews
             if (urls.length > 0) {
               const photoLinks = urls.map((u, i) => `
                 <div style="margin-top: 4px; margin-bottom: 8px;">
@@ -1284,7 +1404,7 @@
           }
         });
 
-        const totalTasks = tasks.length;
+        const totalTasks = validTasks.length;
         const totalCompleted = completedDetails.length;
         const ratePercent = totalTasks > 0 ? Math.round((totalCompleted / totalTasks) * 100) : 0;
 
@@ -1307,6 +1427,7 @@
     };
 
     window.exportCompletionsToCSV = async function() {
+      dismissKeyboard();
       const { data, error } = await supabaseClient
         .from('task_completions')
         .select('*, tasks(title, category)');
@@ -1332,7 +1453,7 @@
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.setAttribute('href', url);
-      a.setAttribute('download', `flipout-cleaning-audit-${new Date().toISOString().split('T')[0]}.csv`);
+      a.setAttribute('download', `flipout-cleaning-audit-${getMelbourneTodayISO()}.csv`);
       a.click();
     };
 
@@ -1464,6 +1585,7 @@
     };
 
     function resetTaskForm() {
+      dismissKeyboard();
       document.getElementById('editing-task-id').value = '';
       document.getElementById('new-task-title').value = '';
       document.getElementById('new-task-category').value = 'Opening';
@@ -1496,6 +1618,7 @@
     document.getElementById('cancel-edit-btn').addEventListener('click', resetTaskForm);
 
     window.handleTaskFormSubmit = async function(isTemporaryJobRequested) {
+      dismissKeyboard();
       const title = document.getElementById('new-task-title').value.trim();
       if (!title) {
         alert('Please enter a task description.');
@@ -1507,9 +1630,11 @@
       const max_photos = parseInt(document.getElementById('new-task-photos-count').value);
       const requires_photo = document.getElementById('new-task-photo').checked;
       const requires_initials = document.getElementById('new-task-initials').checked;
-      const selectedDays = Array.from(document.querySelectorAll('.day-check:checked')).map(cb => cb.value);
-
+      
       const is_temporary = isTemporaryJobRequested;
+      
+      // FIX: Temporary jobs MUST NOT have recurring days array stored to prevent bleed into next weeks/days
+      const selectedDays = is_temporary ? [] : Array.from(document.querySelectorAll('.day-check:checked')).map(cb => cb.value);
       const is_approved = (currentUserRole === 'admin') || is_temporary;
 
       let result;
@@ -1545,13 +1670,14 @@
       if (typeof emailjs !== 'undefined' && EMAILJS_PUBLIC_KEY !== 'YOUR_EMAILJS_PUBLIC_KEY') {
         emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
           job_title: jobTitle,
-          submission_date: new Date().toLocaleString('en-AU')
+          submission_date: new Date().toLocaleString('en-AU', { timeZone: 'Australia/Melbourne' })
         });
       }
     }
 
     document.getElementById('create-user-form').addEventListener('submit', async (e) => {
       e.preventDefault();
+      dismissKeyboard();
       const email = document.getElementById('new-user-email').value;
       const password = document.getElementById('new-user-password').value;
       const msgDiv = document.getElementById('create-user-msg');
@@ -1577,6 +1703,7 @@
     });
 
     window.adminTriggerUserReset = async function() {
+      dismissKeyboard();
       const email = document.getElementById('admin-reset-target-email').value.trim();
       const msgDiv = document.getElementById('admin-reset-msg');
       
@@ -1604,6 +1731,7 @@
 
     document.getElementById('change-my-password-form').addEventListener('submit', async (e) => {
       e.preventDefault();
+      dismissKeyboard();
       const newPassword = document.getElementById('self-new-password').value;
       const msgDiv = document.getElementById('self-pwd-msg');
 
@@ -1623,6 +1751,7 @@
     });
 
     window.triggerWorkerPasswordReset = async function() {
+      dismissKeyboard();
       const email = prompt('Enter your registered email address to receive a password reset link:');
       if (email && email.trim()) {
         const { error } = await supabaseClient.auth.resetPasswordForEmail(email.trim(), {
@@ -1646,6 +1775,7 @@
 
     document.getElementById('admin-login-form').addEventListener('submit', async (e) => {
       e.preventDefault();
+      dismissKeyboard();
       const email = document.getElementById('admin-email').value;
       const password = document.getElementById('admin-password').value;
 
@@ -1691,19 +1821,24 @@
     }
 
     function showMainApp() {
+      dismissKeyboard();
+      if (backOfficeInactivityTimer) clearTimeout(backOfficeInactivityTimer);
       mainApp.classList.remove('hidden');
       adminLoginScreen.classList.add('hidden');
       backOfficeScreen.classList.add('hidden');
     }
 
     function showBackOffice() {
+      dismissKeyboard();
       mainApp.classList.add('hidden');
       adminLoginScreen.classList.add('hidden');
       backOfficeScreen.classList.remove('hidden');
+      resetInactivityTimer();
       checkSession();
     }
 
     document.getElementById('show-admin-login-btn').addEventListener('click', async () => {
+      dismissKeyboard();
       const { data: { session } } = await supabaseClient.auth.getSession();
       if (session) {
         showBackOffice();

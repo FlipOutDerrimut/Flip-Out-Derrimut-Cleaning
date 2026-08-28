@@ -795,8 +795,8 @@
   <!-- 1. STAFF CHECKLIST VIEW -->
   <div id="main-app" class="container">
     <div class="top-left-actions">
-      <button id="show-admin-login-btn" class="top-nav-btn">🔑 Back Office Access</button>
-      <button id="show-eod-report-btn" class="top-nav-btn btn-eod-highlight">📊 Submit EOD Report</button>
+      <button id="show-admin-login-btn" onclick="showAdminLoginScreen()" class="top-nav-btn">🔑 Back Office Access</button>
+      <button id="show-eod-report-btn" onclick="showEODReportScreen()" class="top-nav-btn btn-eod-highlight">📊 Submit EOD Report</button>
     </div>
 
     <div class="brand-header">
@@ -816,13 +816,13 @@
     </div>
 
     <div class="day-selector-container">
-      <button class="day-tab main-day-tab" data-day="monday">Mon</button>
-      <button class="day-tab main-day-tab" data-day="tuesday">Tue</button>
-      <button class="day-tab main-day-tab" data-day="wednesday">Wed</button>
-      <button class="day-tab main-day-tab" data-day="thursday">Thu</button>
-      <button class="day-tab main-day-tab" data-day="friday">Fri</button>
-      <button class="day-tab main-day-tab" data-day="saturday">Sat</button>
-      <button class="day-tab main-day-tab" data-day="sunday">Sun</button>
+      <button class="day-tab main-day-tab" data-day="monday" onclick="selectDay('monday')">Mon</button>
+      <button class="day-tab main-day-tab" data-day="tuesday" onclick="selectDay('tuesday')">Tue</button>
+      <button class="day-tab main-day-tab" data-day="wednesday" onclick="selectDay('wednesday')">Wed</button>
+      <button class="day-tab main-day-tab" data-day="thursday" onclick="selectDay('thursday')">Thu</button>
+      <button class="day-tab main-day-tab" data-day="friday" onclick="selectDay('friday')">Fri</button>
+      <button class="day-tab main-day-tab" data-day="saturday" onclick="selectDay('saturday')">Sat</button>
+      <button class="day-tab main-day-tab" data-day="sunday" onclick="selectDay('sunday')">Sun</button>
     </div>
 
     <div class="checklist-header">
@@ -1090,7 +1090,7 @@
     </div>
 
     <div class="footer">
-      <button id="back-to-app-btn-1" class="admin-link">← Return to Checklist Portal</button>
+      <button id="back-to-app-btn-1" onclick="showMainApp()" class="admin-link">← Return to Checklist Portal</button>
     </div>
   </div>
 
@@ -1242,14 +1242,14 @@
     </div>
 
     <div class="day-selector-container">
-      <button class="day-tab admin-filter-tab active" data-filter="all">All</button>
-      <button class="day-tab admin-filter-tab" data-filter="monday">Mon</button>
-      <button class="day-tab admin-filter-tab" data-filter="tuesday">Tue</button>
-      <button class="day-tab admin-filter-tab" data-filter="wednesday">Wed</button>
-      <button class="day-tab admin-filter-tab" data-filter="thursday">Thu</button>
-      <button class="day-tab admin-filter-tab" data-filter="friday">Fri</button>
-      <button class="day-tab admin-filter-tab" data-filter="saturday">Sat</button>
-      <button class="day-tab admin-filter-tab" data-filter="sunday">Sun</button>
+      <button class="day-tab admin-filter-tab active" data-filter="all" onclick="filterAdminTasks('all', this)">All</button>
+      <button class="day-tab admin-filter-tab" data-filter="monday" onclick="filterAdminTasks('monday', this)">Mon</button>
+      <button class="day-tab admin-filter-tab" data-filter="tuesday" onclick="filterAdminTasks('tuesday', this)">Tue</button>
+      <button class="day-tab admin-filter-tab" data-filter="wednesday" onclick="filterAdminTasks('wednesday', this)">Wed</button>
+      <button class="day-tab admin-filter-tab" data-filter="thursday" onclick="filterAdminTasks('thursday', this)">Thu</button>
+      <button class="day-tab admin-filter-tab" data-filter="friday" onclick="filterAdminTasks('friday', this)">Fri</button>
+      <button class="day-tab admin-filter-tab" data-filter="saturday" onclick="filterAdminTasks('saturday', this)">Sat</button>
+      <button class="day-tab admin-filter-tab" data-filter="sunday" onclick="filterAdminTasks('sunday', this)">Sun</button>
     </div>
 
     <div id="admin-task-list">
@@ -1257,8 +1257,8 @@
     </div>
 
     <div class="footer" style="display: flex; justify-content: space-between; align-items: center;">
-      <button id="logout-btn" class="btn-danger">Sign Out</button>
-      <button id="back-to-app-btn-2" class="admin-link">← Return to Portal</button>
+      <button id="logout-btn" onclick="handleSignOut()" class="btn-danger">Sign Out</button>
+      <button id="back-to-app-btn-2" onclick="showMainApp()" class="admin-link">← Return to Portal</button>
     </div>
   </div>
 
@@ -1419,12 +1419,17 @@
       updateCashCalculator();
     };
 
-    window.showAdminLoginScreen = function() {
-      mainApp.classList.add('hidden');
-      eodReportScreen.classList.add('hidden');
-      cashCalculatorScreen.classList.add('hidden');
-      adminLoginScreen.classList.remove('hidden');
-      backOfficeScreen.classList.add('hidden');
+    window.showAdminLoginScreen = async function() {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (session) {
+        showBackOfficeScreen();
+      } else {
+        mainApp.classList.add('hidden');
+        eodReportScreen.classList.add('hidden');
+        cashCalculatorScreen.classList.add('hidden');
+        adminLoginScreen.classList.remove('hidden');
+        backOfficeScreen.classList.add('hidden');
+      }
     };
 
     window.showBackOfficeScreen = function() {
@@ -1586,6 +1591,7 @@
       selectDay(currentSelectedDay);
       await checkSession();
       setupEODCalculations();
+      setupAuthListeners();
 
       // Background Auto-Refresh Polling
       setInterval(() => {
@@ -1601,6 +1607,82 @@
         }
       }, 15000);
     }
+
+    function setupAuthListeners() {
+      const loginForm = document.getElementById('admin-login-form');
+      if (loginForm) {
+        loginForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          dismissKeyboard();
+          const email = document.getElementById('admin-email').value.trim();
+          const password = document.getElementById('admin-password').value;
+          const errorDiv = document.getElementById('admin-error');
+          errorDiv.textContent = '';
+
+          const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+          if (error) {
+            errorDiv.textContent = error.message;
+          } else {
+            await checkSession();
+            showBackOfficeScreen();
+          }
+        });
+      }
+
+      const createUserForm = document.getElementById('create-user-form');
+      if (createUserForm) {
+        createUserForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          dismissKeyboard();
+          const email = document.getElementById('new-user-email').value.trim();
+          const password = document.getElementById('new-user-password').value;
+          const msgDiv = document.getElementById('create-user-msg');
+          msgDiv.className = '';
+
+          const { data, error } = await supabaseClient.auth.signUp({
+            email,
+            password,
+            options: { data: { role: 'supervisor' } }
+          });
+
+          if (error) {
+            msgDiv.className = 'error-message';
+            msgDiv.textContent = error.message;
+          } else {
+            msgDiv.className = 'success-message';
+            msgDiv.textContent = '✓ Supervisor account created successfully!';
+            createUserForm.reset();
+          }
+        });
+      }
+
+      const changePwdForm = document.getElementById('change-my-password-form');
+      if (changePwdForm) {
+        changePwdForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          dismissKeyboard();
+          const newPassword = document.getElementById('self-new-password').value;
+          const msgDiv = document.getElementById('self-pwd-msg');
+          msgDiv.className = '';
+
+          const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
+          if (error) {
+            msgDiv.className = 'error-message';
+            msgDiv.textContent = error.message;
+          } else {
+            msgDiv.className = 'success-message';
+            msgDiv.textContent = '✓ Password updated successfully!';
+            changePwdForm.reset();
+          }
+        });
+      }
+    }
+
+    window.handleSignOut = async function() {
+      await supabaseClient.auth.signOut();
+      currentUserRole = 'supervisor';
+      showMainApp();
+    };
 
     // CASH CALCULATOR LOGIC & DEDUCT FLOAT AUTO-SYNC TO EOD TAKINGS ($)
     window.updateCashCalculator = function() {
@@ -2173,6 +2255,13 @@
       renderApprovalQueue();
     }
 
+    window.filterAdminTasks = function(filterDay, tabElement) {
+      activeAdminFilter = filterDay;
+      adminFilterTabs.forEach(tab => tab.classList.remove('active'));
+      tabElement.classList.add('active');
+      renderAdminTaskList();
+    };
+
     function renderAdminTaskList() {
       let filteredTasks = allLoadedTasks.filter(t => t.is_approved !== false);
 
@@ -2350,195 +2439,61 @@
       let is_temporary = isTemporaryJobRequested;
       let selectedDays = Array.from(document.querySelectorAll('.day-check:checked')).map(cb => cb.value);
 
-      if (editingId) {
-        const existingTask = allLoadedTasks.find(t => t.id === editingId);
-        if (existingTask) {
-          if (!isTemporaryJobRequested && selectedDays.length > 0) {
-            is_temporary = false;
-          } else if (existingTask.is_temporary && selectedDays.length === 0) {
-            is_temporary = true;
-          }
-        }
+      if (is_temporary && selectedDays.length === 0) {
+        selectedDays = [getMelbourneDayName()];
       }
 
-      if (is_temporary) {
-        selectedDays = [];
-      } else if (selectedDays.length === 0) {
+      if (!is_temporary && selectedDays.length === 0) {
         alert('Please select at least one active day for a permanent job.');
         return;
       }
 
-      const is_approved = (currentUserRole === 'admin') || is_temporary;
+      const is_approved = currentUserRole === 'admin' || is_temporary;
 
-      let result;
+      const taskPayload = {
+        title,
+        category,
+        max_photos,
+        requires_photo,
+        requires_initials,
+        days: selectedDays,
+        is_temporary,
+        is_approved,
+        created_for_date: is_temporary ? getMelbourneTodayISO() : null
+      };
+
       if (editingId) {
-        result = await supabaseClient.from('tasks').update({
-          title, category, max_photos, requires_photo, requires_initials, is_temporary, days: selectedDays
-        }).eq('id', editingId);
-      } else {
-        const nextSortOrder = allLoadedTasks.length + 1;
-        result = await supabaseClient.from('tasks').insert([{
-          title, category, max_photos, requires_photo, requires_initials,
-          is_temporary, is_approved, created_for_date: is_temporary ? currentSelectedDateISO : null,
-          sort_order: nextSortOrder, days: selectedDays
-        }]);
-      }
-
-      if (!result.error) {
-        if (!is_approved) {
-          alert('✓ Permanent job request submitted! An admin will review and approve it shortly.');
-          notifyAdminViaEmail(title);
+        const { error } = await supabaseClient.from('tasks').update(taskPayload).eq('id', editingId);
+        if (error) {
+          alert('Error updating task: ' + error.message);
         } else {
-          alert(`✓ ${editingId ? 'Job updated' : (is_temporary ? 'Temporary job for today' : 'Job')} successfully!`);
+          alert('✓ Task updated successfully!');
+          resetTaskForm();
+          loadAdminTasks();
+          selectDay(currentSelectedDay);
         }
-        resetTaskForm();
-        loadAdminTasks();
-        selectDay(currentSelectedDay);
       } else {
-        alert('Error saving task: ' + result.error.message);
+        const { data: existingTasks } = await supabaseClient.from('tasks').select('sort_order').order('sort_order', { ascending: false }).limit(1);
+        const nextOrder = (existingTasks && existingTasks.length > 0) ? (existingTasks[0].sort_order || 0) + 1 : 1;
+        taskPayload.sort_order = nextOrder;
+
+        const { error } = await supabaseClient.from('tasks').insert([taskPayload]);
+        if (error) {
+          alert('Error adding task: ' + error.message);
+        } else {
+          if (!is_approved) {
+            alert('📩 Permanent job request submitted to Admin for approval!');
+          } else {
+            alert('✓ Task added successfully!');
+          }
+          resetTaskForm();
+          loadAdminTasks();
+          selectDay(currentSelectedDay);
+        }
       }
     };
 
-    function notifyAdminViaEmail(jobTitle) {
-      if (typeof emailjs !== 'undefined' && EMAILJS_PUBLIC_KEY !== 'YOUR_EMAILJS_PUBLIC_KEY' && EMAILJS_TEMPLATE_ID !== 'YOUR_TEMPLATE_ID') {
-        emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
-          job_title: jobTitle,
-          submission_date: new Date().toLocaleString('en-AU', { timeZone: 'Australia/Melbourne' })
-        }).catch(err => console.warn('Admin notification email warning:', err));
-      }
-    }
-
-    // AUTHENTICATION & ACCOUNT HANDLERS
-    async function handleAdminLogin(e) {
-      e.preventDefault();
-      dismissKeyboard();
-      const emailInput = document.getElementById('admin-email');
-      const passwordInput = document.getElementById('admin-password');
-      const errorDiv = document.getElementById('admin-error');
-      errorDiv.textContent = '';
-
-      const email = emailInput.value.trim();
-      const password = passwordInput.value.trim();
-
-      const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-
-      if (error) {
-        errorDiv.textContent = 'Authentication failed: ' + error.message;
-      } else {
-        emailInput.value = '';
-        passwordInput.value = '';
-        await checkSession();
-        showBackOfficeScreen();
-      }
-    }
-
-    async function handleSignOut() {
-      dismissKeyboard();
-      await supabaseClient.auth.signOut();
-      currentUserRole = 'supervisor';
-      await checkSession();
-      showMainApp();
-    }
-
-    async function handleCreateUser(e) {
-      e.preventDefault();
-      dismissKeyboard();
-      const emailInput = document.getElementById('new-user-email');
-      const passwordInput = document.getElementById('new-user-password');
-      const msgDiv = document.getElementById('create-user-msg');
-      msgDiv.className = '';
-
-      const email = emailInput.value.trim();
-      const password = passwordInput.value.trim();
-
-      const { data, error } = await supabaseClient.auth.signUp({
-        email,
-        password,
-        options: {
-          data: { role: 'supervisor' }
-        }
-      });
-
-      if (error) {
-        msgDiv.className = 'error-message';
-        msgDiv.textContent = 'Error creating user: ' + error.message;
-      } else {
-        msgDiv.className = 'success-message';
-        msgDiv.textContent = `✓ Account created for ${email}.`;
-        emailInput.value = '';
-        passwordInput.value = '';
-      }
-    }
-
-    async function handleChangeMyPassword(e) {
-      e.preventDefault();
-      dismissKeyboard();
-      const newPasswordInput = document.getElementById('self-new-password');
-      const msgDiv = document.getElementById('self-pwd-msg');
-      msgDiv.className = '';
-
-      const newPassword = newPasswordInput.value.trim();
-
-      const { data, error } = await supabaseClient.auth.updateUser({ password: newPassword });
-
-      if (error) {
-        msgDiv.className = 'error-message';
-        msgDiv.textContent = 'Failed to update password: ' + error.message;
-      } else {
-        msgDiv.className = 'success-message';
-        msgDiv.textContent = '✓ Password updated successfully!';
-        newPasswordInput.value = '';
-      }
-    }
-
-    // DOM LOAD INITIALISATION & EVENT BINDINGS
-    document.addEventListener('DOMContentLoaded', () => {
-      initialiseApp();
-
-      // Top Navigation Action Listeners
-      const showAdminBtn = document.getElementById('show-admin-login-btn');
-      if (showAdminBtn) showAdminBtn.addEventListener('click', showAdminLoginScreen);
-
-      const showEodBtn = document.getElementById('show-eod-report-btn');
-      if (showEodBtn) showEodBtn.addEventListener('click', showEODReportScreen);
-
-      const backBtn1 = document.getElementById('back-to-app-btn-1');
-      if (backBtn1) backBtn1.addEventListener('click', showMainApp);
-
-      const backBtn2 = document.getElementById('back-to-app-btn-2');
-      if (backBtn2) backBtn2.addEventListener('click', showMainApp);
-
-      const logoutBtn = document.getElementById('logout-btn');
-      if (logoutBtn) logoutBtn.addEventListener('click', handleSignOut);
-
-      // Main App Day Tab Listeners
-      mainDayTabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-          const day = tab.dataset.day;
-          if (day) selectDay(day);
-        });
-      });
-
-      // Back Office Filter Tab Listeners
-      adminFilterTabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-          adminFilterTabs.forEach(t => t.classList.remove('active'));
-          tab.classList.add('active');
-          activeAdminFilter = tab.dataset.filter || 'all';
-          renderAdminTaskList();
-        });
-      });
-
-      // Authentication & Back Office Form Submissions
-      const loginForm = document.getElementById('admin-login-form');
-      if (loginForm) loginForm.addEventListener('submit', handleAdminLogin);
-
-      const createUserForm = document.getElementById('create-user-form');
-      if (createUserForm) createUserForm.addEventListener('submit', handleCreateUser);
-
-      const changePwdForm = document.getElementById('change-my-password-form');
-      if (changePwdForm) changePwdForm.addEventListener('submit', handleChangeMyPassword);
-    });
+    window.addEventListener('DOMContentLoaded', initialiseApp);
   </script>
 </body>
 </html>

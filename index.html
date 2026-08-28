@@ -24,7 +24,7 @@
 
   <style>
     :root {
-      /* Official Flip Out 2025 Brand Colours */
+      /* Official Flip Out Brand Colours */
       --flipout-green: #99C63E;
       --flipout-pink: #FF509F;
       --flipout-purple: #8D2D91;
@@ -127,7 +127,7 @@
       text-align: center;
       margin-bottom: 1.5rem;
       position: relative;
-      margin-top: 2rem; /* Clearance for top left buttons */
+      margin-top: 2rem;
     }
 
     .brand-logo {
@@ -369,7 +369,7 @@
       letter-spacing: 0.5px;
     }
 
-    /* EOD REPORT FORM SPECIFIC STYLING */
+    /* EOD REPORT FORM STYLING MATCHING PDF */
     .eod-card {
       background: var(--bg-card-alt);
       border-radius: 14px;
@@ -760,43 +760,43 @@
     </div>
   </div>
 
-  <!-- 2. NEW EOD TAKINGS REPORT FORM VIEW -->
+  <!-- 2. END OF DAY REPORT FORM VIEW (MATCHED TO PDF LAYOUT) -->
   <div id="eod-report-screen" class="container hidden">
     <div class="top-left-actions">
       <button onclick="showMainApp()" class="top-nav-btn">← Return to Portal</button>
     </div>
 
     <div class="brand-header">
-      <img src="FO Derrimut-01.png" alt="Flip Out Derrimut Logo" class="brand-logo" style="max-width: 180px;">
-      <div class="sub-title" style="color: var(--flipout-green);">End of Day Takings Report</div>
+      <img src="FO Derrimut-01.png" alt="Flip Out Derrimut Logo" class="brand-logo" style="max-width: 170px;">
+      <h2 style="margin: 4px 0 2px 0; color: var(--flipout-green); font-size: 1.15rem; letter-spacing: 0.5px;">END OF DAY REPORT</h2>
+      <div class="sub-title" style="color: var(--flipout-pink); font-size: 0.85rem;">FLIPOUT DERRIMUT</div>
     </div>
 
     <form id="eod-takings-form">
-      <!-- DATE, DAY & STAFF MEMBERS SECTION -->
+      <!-- GENERAL INFORMATION SECTION (PDF Top Header Block) -->
       <div class="eod-card eod-card-green">
-        <div class="eod-section-title">📅 General Information</div>
         <div class="eod-grid-2">
           <div class="form-group">
-            <label for="eod-date">Date</label>
-            <input type="text" id="eod-date" class="eod-read-only" readonly />
+            <label for="eod-day">Day:</label>
+            <input type="text" id="eod-day" class="eod-read-only" readonly />
           </div>
           <div class="form-group">
-            <label for="eod-day">Day of Week</label>
-            <input type="text" id="eod-day" class="eod-read-only" readonly />
+            <label for="eod-date">Date:</label>
+            <input type="text" id="eod-date" class="eod-read-only" readonly />
           </div>
         </div>
         <div class="form-group" style="margin-bottom: 0;">
-          <label for="eod-staff">Staff Members On Shift</label>
+          <label for="eod-staff">Staff Member/s:</label>
           <input type="text" id="eod-staff" placeholder="e.g. Josh, Daniel, Calvin" required />
         </div>
       </div>
 
-      <!-- FLOAT & CASH TAKINGS SECTION -->
+      <!-- RECEPTION 1 / CASH TAKINGS SECTION (PDF Section 1) -->
       <div class="eod-card">
-        <div class="eod-section-title">💵 Cash & Takings</div>
+        <div class="eod-section-title">💵 Reception 1</div>
         <div class="eod-grid-2">
           <div class="form-group">
-            <label for="eod-float">Fixed Register Float</label>
+            <label for="eod-float">Float <span style="font-weight: normal; font-size: 0.75rem; color: var(--text-muted);">(Morning till float - excluded from total)</span></label>
             <input type="text" id="eod-float" value="$300.00" class="eod-read-only" readonly />
           </div>
           <div class="form-group">
@@ -808,35 +808,43 @@
             <input type="number" step="0.01" min="0" id="eod-eod-takings-input" placeholder="0.00" value="0.00" required />
           </div>
           <div class="form-group">
-            <label for="eod-total-cash-1">Total Cash (Takings + EOD Takings)</label>
+            <label for="eod-total-cash-1">Total Cash ($)</label>
             <input type="text" id="eod-total-cash-1" class="eod-calculated-field" value="$0.00" readonly />
           </div>
         </div>
       </div>
 
-      <!-- RECEPTION EFTPOS SECTION -->
+      <!-- EFTPOS STATEMENT SECTION (PDF Section 2) -->
       <div class="eod-card">
-        <div class="eod-section-title">💳 Reception EFTPOS Statements</div>
+        <div class="eod-section-title">💳 Eftpos Statement</div>
         <div class="eod-grid-2">
           <div class="form-group">
-            <label for="eod-eftpos-1">EFTPOS Statement 1 ($)</label>
+            <label for="eod-eftpos-1">Reception 1 ($)</label>
             <input type="number" step="0.01" min="0" id="eod-eftpos-1" placeholder="0.00" value="0.00" required />
           </div>
           <div class="form-group">
-            <label for="eod-eftpos-2">EFTPOS Statement 2 ($)</label>
+            <label for="eod-eftpos-2">Reception 2 ($)</label>
             <input type="number" step="0.01" min="0" id="eod-eftpos-2" placeholder="0.00" value="0.00" required />
           </div>
         </div>
         <div class="form-group" style="margin-bottom: 0;">
-          <label for="eod-total-eftpos">Total EFTPOS</label>
+          <label for="eod-total-eftpos">Total Eftpos ($)</label>
           <input type="text" id="eod-total-eftpos" class="eod-calculated-field" value="$0.00" readonly />
         </div>
       </div>
 
-      <!-- ONLINE BOOKING & BANK TRANSFER SECTION -->
-      <div class="eod-card">
-        <div class="eod-section-title">🌐 Online & Direct Revenue</div>
+      <!-- TOTALS SUMMARY SECTION (PDF Section 3) -->
+      <div class="eod-card eod-card-green">
+        <div class="eod-section-title">📊 Totals</div>
         <div class="eod-grid-2">
+          <div class="form-group">
+            <label for="eod-summary-eftpos">Total Eftpos ($)</label>
+            <input type="text" id="eod-summary-eftpos" class="eod-calculated-field" value="$0.00" readonly />
+          </div>
+          <div class="form-group">
+            <label for="eod-total-cash-2">Total Cash ($)</label>
+            <input type="text" id="eod-total-cash-2" class="eod-calculated-field" value="$0.00" readonly />
+          </div>
           <div class="form-group">
             <label for="eod-online-booking">Online Booking ($)</label>
             <input type="number" step="0.01" min="0" id="eod-online-booking" placeholder="0.00" value="0.00" required />
@@ -846,24 +854,9 @@
             <input type="number" step="0.01" min="0" id="eod-bank-transfer" placeholder="0.00" value="0.00" required />
           </div>
         </div>
-      </div>
-
-      <!-- TOTALS SUMMARY SECTION -->
-      <div class="eod-card eod-card-green">
-        <div class="eod-section-title">📈 Final Reconciliation Totals</div>
-        <div class="eod-grid-2">
-          <div class="form-group">
-            <label for="eod-total-cash-2">Total Cash Section</label>
-            <input type="text" id="eod-total-cash-2" class="eod-calculated-field" value="$0.00" readonly />
-          </div>
-          <div class="form-group">
-            <label for="eod-summary-eftpos">Total EFTPOS Section</label>
-            <input type="text" id="eod-summary-eftpos" class="eod-calculated-field" value="$0.00" readonly />
-          </div>
-        </div>
-        <div class="form-group">
-          <label for="eod-grand-total-input" style="color: var(--flipout-green); font-size: 0.95rem; font-weight: 800;">GRAND TOTAL ($)</label>
-          <input type="text" id="eod-grand-total-input" class="eod-grand-total" value="$300.00" readonly />
+        <div class="form-group" style="margin-top: 0.5rem; margin-bottom: 0;">
+          <label for="eod-grand-total-input" style="color: var(--flipout-green); font-size: 0.95rem; font-weight: 800;">TOTAL ($)</label>
+          <input type="text" id="eod-grand-total-input" class="eod-grand-total" value="$0.00" readonly />
         </div>
       </div>
 
@@ -1300,7 +1293,7 @@
       }, 15000);
     }
 
-    // EOD REPORT LIVE CALCULATIONS & FORM LOGIC
+    // EOD REPORT LIVE CALCULATIONS & FORM LOGIC (FLOAT EXCLUDED FROM TOTAL)
     function setupEODCalculations() {
       const inputs = [
         'eod-takings-input',
@@ -1328,25 +1321,24 @@
       const eftpos2 = parseFloat(document.getElementById('eod-eftpos-2').value) || 0;
       const online = parseFloat(document.getElementById('eod-online-booking').value) || 0;
       const bank = parseFloat(document.getElementById('eod-bank-transfer').value) || 0;
-      const fixedFloat = 300.00;
 
       // 1. Calculate Total Cash (Takings + EOD Takings)
       const totalCash = takings + eodTakings;
       const totalCashFormatted = `$${totalCash.toFixed(2)}`;
       
-      // Update both Total Cash display sections
+      // Update both Total Cash display fields
       document.getElementById('eod-total-cash-1').value = totalCashFormatted;
       document.getElementById('eod-total-cash-2').value = totalCashFormatted;
 
-      // 2. Calculate Total EFTPOS (Statement 1 + Statement 2)
+      // 2. Calculate Total Eftpos (Reception 1 + Reception 2)
       const totalEftpos = eftpos1 + eftpos2;
       const totalEftposFormatted = `$${totalEftpos.toFixed(2)}`;
       
       document.getElementById('eod-total-eftpos').value = totalEftposFormatted;
       document.getElementById('eod-summary-eftpos').value = totalEftposFormatted;
 
-      // 3. Calculate Grand Total
-      const grandTotal = totalCash + totalEftpos + online + bank + fixedFloat;
+      // 3. Calculate Final Total (Fixed $300 float is NOT included in grand total calculation)
+      const grandTotal = totalCash + totalEftpos + online + bank;
       document.getElementById('eod-grand-total-input').value = `$${grandTotal.toFixed(2)}`;
     }
 
@@ -1391,13 +1383,12 @@
           .insert([reportData]);
 
         if (error) {
-          // If custom table isn't created yet, fall back gracefully to notification alert
           console.warn('Supabase DB Insert Note:', error.message);
         }
 
         msgDiv.className = 'success-message';
         msgDiv.textContent = '✓ End of Day Report submitted successfully!';
-        alert(`✓ EOD Report Submitted Successfully!\n\nDate: ${reportData.date}\nStaff: ${reportData.staff}\nGrand Total: ${reportData.grand_total}`);
+        alert(`✓ EOD Report Submitted Successfully!\n\nDate: ${reportData.date}\nStaff: ${reportData.staff}\nTotal: ${reportData.grand_total}`);
         
         setTimeout(() => {
           showMainApp();

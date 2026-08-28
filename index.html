@@ -1449,6 +1449,50 @@
       }
     };
 
+    // Password Reset Helpers
+    window.triggerWorkerPasswordReset = async function() {
+      dismissKeyboard();
+      const email = prompt('Enter your registered email address to receive a password reset link:');
+      if (!email || !email.trim()) return;
+
+      const { error } = await supabaseClient.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: window.location.href
+      });
+
+      if (error) {
+        alert('Error sending reset email: ' + error.message);
+      } else {
+        alert('✓ Password reset instructions have been sent to ' + email.trim());
+      }
+    };
+
+    window.adminTriggerUserReset = async function() {
+      dismissKeyboard();
+      const targetEmailInput = document.getElementById('admin-reset-target-email');
+      const msgDiv = document.getElementById('admin-reset-msg');
+      msgDiv.className = '';
+      const email = targetEmailInput.value.trim();
+
+      if (!email) {
+        msgDiv.className = 'error-message';
+        msgDiv.textContent = 'Please enter a target email address.';
+        return;
+      }
+
+      const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.href
+      });
+
+      if (error) {
+        msgDiv.className = 'error-message';
+        msgDiv.textContent = 'Reset error: ' + error.message;
+      } else {
+        msgDiv.className = 'success-message';
+        msgDiv.textContent = `✓ Password reset email sent to ${email}`;
+        targetEmailInput.value = '';
+      }
+    };
+
     // Helper to safely parse multi-photo storage format
     function parsePhotoUrls(photoData) {
       if (!photoData) return [];
@@ -1623,7 +1667,10 @@
         }
       });
 
-      document.getElementById('eod-takings-form').addEventListener('submit', handleEODReportSubmit);
+      const eodForm = document.getElementById('eod-takings-form');
+      if (eodForm) {
+        eodForm.addEventListener('submit', handleEODReportSubmit);
+      }
     }
 
     function calculateEODTotals() {
@@ -2300,9 +2347,27 @@
       const requires_photo = document.getElementById('new-task-photo').checked;
       const requires_initials = document.getElementById('new-task-initials').checked;
       
-      const is_temporary = isTemporaryJobRequested;
-      
-      const selectedDays = is_temporary ? [] : Array.from(document.querySelectorAll('.day-check:checked')).map(cb => cb.value);
+      let is_temporary = isTemporaryJobRequested;
+      let selectedDays = Array.from(document.querySelectorAll('.day-check:checked')).map(cb => cb.value);
+
+      if (editingId) {
+        const existingTask = allLoadedTasks.find(t => t.id === editingId);
+        if (existingTask) {
+          if (!isTemporaryJobRequested && selectedDays.length > 0) {
+            is_temporary = false;
+          } else if (existingTask.is_temporary && selectedDays.length === 0) {
+            is_temporary = true;
+          }
+        }
+      }
+
+      if (is_temporary) {
+        selectedDays = [];
+      } else if (selectedDays.length === 0) {
+        alert('Please select at least one active day for a permanent job.');
+        return;
+      }
+
       const is_approved = (currentUserRole === 'admin') || is_temporary;
 
       let result;
@@ -2324,7 +2389,7 @@
           alert('✓ Permanent job request submitted! An admin will review and approve it shortly.');
           notifyAdminViaEmail(title);
         } else {
-          alert(`✓ ${is_temporary ? 'Temporary job for today' : 'Job'} added successfully!`);
+          alert(`✓ ${editingId ? 'Job updated' : (is_temporary ? 'Temporary job for today' : 'Job')} successfully!`);
         }
         resetTaskForm();
         loadAdminTasks();
@@ -2335,164 +2400,145 @@
     };
 
     function notifyAdminViaEmail(jobTitle) {
-      if (typeof emailjs !== 'undefined' && EMAILJS_PUBLIC_KEY !== 'YOUR_EMAILJS_PUBLIC_KEY') {
+      if (typeof emailjs !== 'undefined' && EMAILJS_PUBLIC_KEY !== 'YOUR_EMAILJS_PUBLIC_KEY' && EMAILJS_TEMPLATE_ID !== 'YOUR_TEMPLATE_ID') {
         emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
           job_title: jobTitle,
           submission_date: new Date().toLocaleString('en-AU', { timeZone: 'Australia/Melbourne' })
-        });
+        }).catch(err => console.warn('Admin notification email warning:', err));
       }
     }
 
-    document.getElementById('create-user-form').addEventListener('submit', async (e) => {
+    // AUTHENTICATION & ACCOUNT HANDLERS
+    async function handleAdminLogin(e) {
       e.preventDefault();
       dismissKeyboard();
-      const email = document.getElementById('new-user-email').value;
-      const password = document.getElementById('new-user-password').value;
-      const msgDiv = document.getElementById('create-user-msg');
-
-      msgDiv.className = '';
-      msgDiv.textContent = 'Creating supervisor account...';
-
-      const { data, error } = await supabaseClient.auth.signUp({
-        email: email,
-        password: password,
-        options: { data: { role: 'supervisor' } }
-      });
-
-      if (error) {
-        msgDiv.className = 'error-message';
-        msgDiv.textContent = 'Error: ' + error.message;
-      } else {
-        msgDiv.className = 'success-message';
-        msgDiv.textContent = `✓ Supervisor account created for ${email}!`;
-        document.getElementById('new-user-email').value = '';
-        document.getElementById('new-user-password').value = '';
-      }
-    });
-
-    window.adminTriggerUserReset = async function() {
-      dismissKeyboard();
-      const email = document.getElementById('admin-reset-target-email').value.trim();
-      const msgDiv = document.getElementById('admin-reset-msg');
-      
-      if (!email) {
-        alert('Please enter a valid worker email address.');
-        return;
-      }
-
-      msgDiv.className = '';
-      msgDiv.textContent = 'Sending password reset link...';
-
-      const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.href
-      });
-
-      if (error) {
-        msgDiv.className = 'error-message';
-        msgDiv.textContent = 'Failed: ' + error.message;
-      } else {
-        msgDiv.className = 'success-message';
-        msgDiv.textContent = `✓ Password reset link sent to ${email}!`;
-        document.getElementById('admin-reset-target-email').value = '';
-      }
-    };
-
-    document.getElementById('change-my-password-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      dismissKeyboard();
-      const newPassword = document.getElementById('self-new-password').value;
-      const msgDiv = document.getElementById('self-pwd-msg');
-
-      msgDiv.className = '';
-      msgDiv.textContent = 'Updating password...';
-
-      const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
-
-      if (error) {
-        msgDiv.className = 'error-message';
-        msgDiv.textContent = 'Error: ' + error.message;
-      } else {
-        msgDiv.className = 'success-message';
-        msgDiv.textContent = '✓ Your password has been successfully updated!';
-        document.getElementById('self-new-password').value = '';
-      }
-    });
-
-    window.triggerWorkerPasswordReset = async function() {
-      dismissKeyboard();
-      const email = prompt('Enter your registered email address to receive a password reset link:');
-      if (email && email.trim()) {
-        const { error } = await supabaseClient.auth.resetPasswordForEmail(email.trim(), {
-          redirectTo: window.location.href
-        });
-        if (error) {
-          alert('Error sending reset email: ' + error.message);
-        } else {
-          alert('✓ Password reset link sent to ' + email.trim());
-        }
-      }
-    };
-
-    // Event Listeners for Authentication & Navigation
-    document.getElementById('admin-login-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      dismissKeyboard();
-      const email = document.getElementById('admin-email').value.trim();
-      const password = document.getElementById('admin-password').value;
+      const emailInput = document.getElementById('admin-email');
+      const passwordInput = document.getElementById('admin-password');
       const errorDiv = document.getElementById('admin-error');
       errorDiv.textContent = '';
 
-      const { data, error } = await supabaseClient.auth.signInWithPassword({
-        email,
-        password
-      });
+      const email = emailInput.value.trim();
+      const password = passwordInput.value.trim();
+
+      const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
 
       if (error) {
-        errorDiv.textContent = error.message;
+        errorDiv.textContent = 'Authentication failed: ' + error.message;
       } else {
+        emailInput.value = '';
+        passwordInput.value = '';
         await checkSession();
         showBackOfficeScreen();
       }
-    });
+    }
 
-    document.getElementById('logout-btn').addEventListener('click', async () => {
+    async function handleSignOut() {
       dismissKeyboard();
       await supabaseClient.auth.signOut();
       currentUserRole = 'supervisor';
+      await checkSession();
       showMainApp();
-    });
+    }
 
-    document.getElementById('show-admin-login-btn').addEventListener('click', async () => {
-      const { data: { session } } = await supabaseClient.auth.getSession();
-      if (session) {
-        await checkSession();
-        showBackOfficeScreen();
+    async function handleCreateUser(e) {
+      e.preventDefault();
+      dismissKeyboard();
+      const emailInput = document.getElementById('new-user-email');
+      const passwordInput = document.getElementById('new-user-password');
+      const msgDiv = document.getElementById('create-user-msg');
+      msgDiv.className = '';
+
+      const email = emailInput.value.trim();
+      const password = passwordInput.value.trim();
+
+      const { data, error } = await supabaseClient.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { role: 'supervisor' }
+        }
+      });
+
+      if (error) {
+        msgDiv.className = 'error-message';
+        msgDiv.textContent = 'Error creating user: ' + error.message;
       } else {
-        showAdminLoginScreen();
+        msgDiv.className = 'success-message';
+        msgDiv.textContent = `✓ Account created for ${email}.`;
+        emailInput.value = '';
+        passwordInput.value = '';
       }
-    });
+    }
 
-    document.getElementById('show-eod-report-btn').addEventListener('click', showEODReportScreen);
-    document.getElementById('back-to-app-btn-1').addEventListener('click', showMainApp);
-    document.getElementById('back-to-app-btn-2').addEventListener('click', showMainApp);
+    async function handleChangeMyPassword(e) {
+      e.preventDefault();
+      dismissKeyboard();
+      const newPasswordInput = document.getElementById('self-new-password');
+      const msgDiv = document.getElementById('self-pwd-msg');
+      msgDiv.className = '';
 
-    mainDayTabs.forEach(tab => {
-      tab.addEventListener('click', () => {
-        selectDay(tab.dataset.day);
+      const newPassword = newPasswordInput.value.trim();
+
+      const { data, error } = await supabaseClient.auth.updateUser({ password: newPassword });
+
+      if (error) {
+        msgDiv.className = 'error-message';
+        msgDiv.textContent = 'Failed to update password: ' + error.message;
+      } else {
+        msgDiv.className = 'success-message';
+        msgDiv.textContent = '✓ Password updated successfully!';
+        newPasswordInput.value = '';
+      }
+    }
+
+    // DOM LOAD INITIALISATION & EVENT BINDINGS
+    document.addEventListener('DOMContentLoaded', () => {
+      initialiseApp();
+
+      // Top Navigation Action Listeners
+      const showAdminBtn = document.getElementById('show-admin-login-btn');
+      if (showAdminBtn) showAdminBtn.addEventListener('click', showAdminLoginScreen);
+
+      const showEodBtn = document.getElementById('show-eod-report-btn');
+      if (showEodBtn) showEodBtn.addEventListener('click', showEODReportScreen);
+
+      const backBtn1 = document.getElementById('back-to-app-btn-1');
+      if (backBtn1) backBtn1.addEventListener('click', showMainApp);
+
+      const backBtn2 = document.getElementById('back-to-app-btn-2');
+      if (backBtn2) backBtn2.addEventListener('click', showMainApp);
+
+      const logoutBtn = document.getElementById('logout-btn');
+      if (logoutBtn) logoutBtn.addEventListener('click', handleSignOut);
+
+      // Main App Day Tab Listeners
+      mainDayTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+          const day = tab.dataset.day;
+          if (day) selectDay(day);
+        });
       });
-    });
 
-    adminFilterTabs.forEach(tab => {
-      tab.addEventListener('click', () => {
-        adminFilterTabs.forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-        activeAdminFilter = tab.dataset.filter;
-        renderAdminTaskList();
+      // Back Office Filter Tab Listeners
+      adminFilterTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+          adminFilterTabs.forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+          activeAdminFilter = tab.dataset.filter || 'all';
+          renderAdminTaskList();
+        });
       });
-    });
 
-    // Start App
-    window.addEventListener('DOMContentLoaded', initialiseApp);
+      // Authentication & Back Office Form Submissions
+      const loginForm = document.getElementById('admin-login-form');
+      if (loginForm) loginForm.addEventListener('submit', handleAdminLogin);
+
+      const createUserForm = document.getElementById('create-user-form');
+      if (createUserForm) createUserForm.addEventListener('submit', handleCreateUser);
+
+      const changePwdForm = document.getElementById('change-my-password-form');
+      if (changePwdForm) changePwdForm.addEventListener('submit', handleChangeMyPassword);
+    });
   </script>
 </body>
 </html>

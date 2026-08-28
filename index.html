@@ -86,6 +86,17 @@
       z-index: 20;
     }
 
+    /* Top Right Navigation Actions */
+    .top-right-actions {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 20;
+    }
+
     .top-nav-btn {
       background: rgba(255, 255, 255, 0.08);
       border: 1px solid rgba(255, 255, 255, 0.25);
@@ -433,6 +444,82 @@
       text-align: right;
     }
 
+    /* CASH CALCULATOR TABLE STYLING MATCHING PDF ATTACHMENT */
+    .cash-calc-table-container {
+      width: 100%;
+      overflow-x: auto;
+      margin-top: 1rem;
+      border-radius: 8px;
+    }
+
+    .cash-calc-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #FFFFFF;
+      color: #000000;
+      border: 2px solid #000000;
+    }
+
+    .cash-calc-table th {
+      background-color: var(--flipout-green);
+      color: #000000;
+      font-weight: 800;
+      font-family: 'Unbounded', sans-serif;
+      font-size: 0.95rem;
+      padding: 10px;
+      border: 2px solid #000000;
+      text-align: center;
+    }
+
+    .cash-calc-table td {
+      border: 2px solid #000000;
+      padding: 8px 12px;
+      font-weight: 700;
+      font-size: 1rem;
+      text-align: center;
+      color: #000000;
+    }
+
+    .cash-calc-table td:first-child {
+      font-weight: 800;
+      font-size: 1.05rem;
+    }
+
+    .cash-calc-table input.calc-qty {
+      width: 100%;
+      max-width: 140px;
+      text-align: center;
+      font-weight: 700;
+      font-size: 1.05rem;
+      padding: 6px;
+      border: 1px solid #000000;
+      background: #FFFFFF;
+      color: #000000;
+      border-radius: 4px;
+    }
+
+    .cash-calc-table input.calc-qty:focus {
+      outline: 2px solid var(--flipout-pink);
+      border-color: var(--flipout-pink);
+    }
+
+    .cash-calc-table .highlight-label {
+      background-color: var(--flipout-green);
+      color: #000000;
+      font-weight: 800;
+      font-family: 'Unbounded', sans-serif;
+      text-align: center;
+      font-size: 1rem;
+    }
+
+    .cash-calc-table .highlight-val {
+      font-weight: 900;
+      font-size: 1.15rem;
+      background-color: #FFFFFF;
+      color: #000000;
+      text-align: center;
+    }
+
     .reward-modal-overlay {
       position: fixed;
       top: 0;
@@ -766,6 +853,11 @@
       <button onclick="showMainApp()" class="top-nav-btn">← Return to Portal</button>
     </div>
 
+    <!-- Top Right Action: Cash Calculator Button -->
+    <div class="top-right-actions">
+      <button onclick="showCashCalculatorScreen()" class="top-nav-btn btn-eod-highlight">🧮 Cash Calculator</button>
+    </div>
+
     <div class="brand-header">
       <img src="FO Derrimut-01.png" alt="Flip Out Derrimut Logo" class="brand-logo" style="max-width: 170px;">
       <h2 style="margin: 4px 0 2px 0; color: var(--flipout-green); font-size: 1.15rem; letter-spacing: 0.5px;">END OF DAY REPORT</h2>
@@ -869,7 +961,108 @@
     </div>
   </div>
 
-  <!-- 3. ADMIN & WORKER LOGIN SCREEN -->
+  <!-- 3. CASH CALCULATOR VIEW -->
+  <div id="cash-calculator-screen" class="container hidden">
+    <div class="top-left-actions">
+      <button onclick="showEODReportScreen()" class="top-nav-btn">← Return to EOD Report</button>
+    </div>
+
+    <div class="brand-header">
+      <img src="FO Derrimut-01.png" alt="Flip Out Derrimut Logo" class="brand-logo" style="max-width: 170px;">
+      <h2 style="margin: 4px 0 2px 0; color: var(--flipout-green); font-size: 1.15rem; letter-spacing: 0.5px;">CASH CALCULATOR</h2>
+      <div class="sub-title" style="color: var(--flipout-pink); font-size: 0.85rem;">FLIPOUT DERRIMUT</div>
+    </div>
+
+    <div class="cash-calc-table-container">
+      <table class="cash-calc-table">
+        <thead>
+          <tr>
+            <th>Cash</th>
+            <th>Quantity</th>
+            <th>Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>$100.00</td>
+            <td><input type="number" min="0" value="0" class="calc-qty" data-denom="100.00" oninput="updateCashCalculator()"></td>
+            <td class="calc-row-amount" id="amt-100-00">$0.00</td>
+          </tr>
+          <tr>
+            <td>$50.00</td>
+            <td><input type="number" min="0" value="0" class="calc-qty" data-denom="50.00" oninput="updateCashCalculator()"></td>
+            <td class="calc-row-amount" id="amt-50-00">$0.00</td>
+          </tr>
+          <tr>
+            <td>$20.00</td>
+            <td><input type="number" min="0" value="0" class="calc-qty" data-denom="20.00" oninput="updateCashCalculator()"></td>
+            <td class="calc-row-amount" id="amt-20-00">$0.00</td>
+          </tr>
+          <tr>
+            <td>$10.00</td>
+            <td><input type="number" min="0" value="0" class="calc-qty" data-denom="10.00" oninput="updateCashCalculator()"></td>
+            <td class="calc-row-amount" id="amt-10-00">$0.00</td>
+          </tr>
+          <tr>
+            <td>$5.00</td>
+            <td><input type="number" min="0" value="0" class="calc-qty" data-denom="5.00" oninput="updateCashCalculator()"></td>
+            <td class="calc-row-amount" id="amt-5-00">$0.00</td>
+          </tr>
+          <tr>
+            <td>$2.00</td>
+            <td><input type="number" min="0" value="0" class="calc-qty" data-denom="2.00" oninput="updateCashCalculator()"></td>
+            <td class="calc-row-amount" id="amt-2-00">$0.00</td>
+          </tr>
+          <tr>
+            <td>$1.00</td>
+            <td><input type="number" min="0" value="0" class="calc-qty" data-denom="1.00" oninput="updateCashCalculator()"></td>
+            <td class="calc-row-amount" id="amt-1-00">$0.00</td>
+          </tr>
+          <tr>
+            <td>$0.50</td>
+            <td><input type="number" min="0" value="0" class="calc-qty" data-denom="0.50" oninput="updateCashCalculator()"></td>
+            <td class="calc-row-amount" id="amt-0-50">$0.00</td>
+          </tr>
+          <tr>
+            <td>$0.20</td>
+            <td><input type="number" min="0" value="0" class="calc-qty" data-denom="0.20" oninput="updateCashCalculator()"></td>
+            <td class="calc-row-amount" id="amt-0-20">$0.00</td>
+          </tr>
+          <tr>
+            <td>$0.10</td>
+            <td><input type="number" min="0" value="0" class="calc-qty" data-denom="0.10" oninput="updateCashCalculator()"></td>
+            <td class="calc-row-amount" id="amt-0-10">$0.00</td>
+          </tr>
+          <tr>
+            <td>$0.05</td>
+            <td><input type="number" min="0" value="0" class="calc-qty" data-denom="0.05" oninput="updateCashCalculator()"></td>
+            <td class="calc-row-amount" id="amt-0-05">$0.00</td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="2" class="highlight-label">Total</td>
+            <td id="cash-calc-total" class="highlight-val">$0.00</td>
+          </tr>
+          <tr>
+            <td colspan="2" class="highlight-label">Deduct Float</td>
+            <td id="cash-calc-deduct-float" class="highlight-val">-$300.00</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <div style="margin-top: 1.5rem; display: flex; gap: 10px;">
+      <button onclick="resetCashCalculator()" class="btn-secondary" style="flex: 1;">🔄 Clear Values</button>
+      <button onclick="showEODReportScreen()" class="btn-primary" style="flex: 2;">✓ Return to EOD Report</button>
+    </div>
+
+    <div class="footer">
+      <button onclick="showEODReportScreen()" class="admin-link">← Return to EOD Report</button>
+    </div>
+  </div>
+
+  <!-- 4. ADMIN & WORKER LOGIN SCREEN -->
   <div id="admin-login-screen" class="container hidden">
     <div class="brand-header">
       <img src="FO Derrimut-01.png" alt="Flip Out Derrimut Logo" class="brand-logo" style="max-width: 180px;">
@@ -901,7 +1094,7 @@
     </div>
   </div>
 
-  <!-- 4. BACK OFFICE TASK MANAGER -->
+  <!-- 5. BACK OFFICE TASK MANAGER -->
   <div id="back-office-screen" class="container hidden">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 1rem;">
       <div style="display: flex; align-items: center; gap: 12px;">
@@ -1069,7 +1262,7 @@
     </div>
   </div>
 
-  <!-- 5. MOTIVATIONAL REWARD MODAL -->
+  <!-- 6. MOTIVATIONAL REWARD MODAL -->
   <div id="reward-modal" class="reward-modal-overlay hidden">
     <div class="reward-modal-card">
       <div class="reward-icon">🎉</div>
@@ -1186,6 +1379,7 @@
     // DOM Elements
     const mainApp = document.getElementById('main-app');
     const eodReportScreen = document.getElementById('eod-report-screen');
+    const cashCalculatorScreen = document.getElementById('cash-calculator-screen');
     const adminLoginScreen = document.getElementById('admin-login-screen');
     const backOfficeScreen = document.getElementById('back-office-screen');
     const pendingTasksContainer = document.getElementById('pending-tasks-container');
@@ -1292,6 +1486,53 @@
         }
       }, 15000);
     }
+
+    // CASH CALCULATOR LOGIC & DEDUCT FLOAT AUTO-SYNC TO EOD TAKINGS ($)
+    window.updateCashCalculator = function() {
+      const qtyInputs = document.querySelectorAll('.calc-qty');
+      let grandTotal = 0;
+
+      qtyInputs.forEach(input => {
+        const denom = parseFloat(input.dataset.denom);
+        const qty = parseInt(input.value) || 0;
+        const rowAmount = denom * qty;
+        grandTotal += rowAmount;
+
+        const rowId = `amt-${input.dataset.denom.replace('.', '-')}`;
+        const amtCell = document.getElementById(rowId);
+        if (amtCell) {
+          amtCell.textContent = `$${rowAmount.toFixed(2)}`;
+        }
+      });
+
+      document.getElementById('cash-calc-total').textContent = `$${grandTotal.toFixed(2)}`;
+
+      const deductFloat = grandTotal - 300.00;
+      const deductFloatEl = document.getElementById('cash-calc-deduct-float');
+
+      if (deductFloat < 0) {
+        deductFloatEl.textContent = `-$${Math.abs(deductFloat).toFixed(2)}`;
+      } else {
+        deductFloatEl.textContent = `$${deductFloat.toFixed(2)}`;
+      }
+
+      // Automatically update the EOD Takings ($) field when float deduction is positive
+      const eodTakingsInput = document.getElementById('eod-eod-takings-input');
+      if (deductFloat > 0) {
+        eodTakingsInput.value = deductFloat.toFixed(2);
+      } else {
+        eodTakingsInput.value = '0.00';
+      }
+      
+      calculateEODTotals();
+    };
+
+    window.resetCashCalculator = function() {
+      document.querySelectorAll('.calc-qty').forEach(input => {
+        input.value = 0;
+      });
+      updateCashCalculator();
+    };
 
     // EOD REPORT LIVE CALCULATIONS & FORM LOGIC (FLOAT EXCLUDED FROM TOTAL)
     function setupEODCalculations() {
@@ -2126,6 +2367,7 @@
       if (backOfficeInactivityTimer) clearTimeout(backOfficeInactivityTimer);
       mainApp.classList.remove('hidden');
       eodReportScreen.classList.add('hidden');
+      cashCalculatorScreen.classList.add('hidden');
       adminLoginScreen.classList.add('hidden');
       backOfficeScreen.classList.add('hidden');
     }
@@ -2135,6 +2377,16 @@
       populateEODReportFields();
       mainApp.classList.add('hidden');
       eodReportScreen.classList.remove('hidden');
+      cashCalculatorScreen.classList.add('hidden');
+      adminLoginScreen.classList.add('hidden');
+      backOfficeScreen.classList.add('hidden');
+    }
+
+    function showCashCalculatorScreen() {
+      dismissKeyboard();
+      mainApp.classList.add('hidden');
+      eodReportScreen.classList.add('hidden');
+      cashCalculatorScreen.classList.remove('hidden');
       adminLoginScreen.classList.add('hidden');
       backOfficeScreen.classList.add('hidden');
     }
@@ -2143,6 +2395,7 @@
       dismissKeyboard();
       mainApp.classList.add('hidden');
       eodReportScreen.classList.add('hidden');
+      cashCalculatorScreen.classList.add('hidden');
       adminLoginScreen.classList.add('hidden');
       backOfficeScreen.classList.remove('hidden');
       resetInactivityTimer();

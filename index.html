@@ -1840,9 +1840,16 @@
 
       if (isChecking) {
         const initialsInput = document.getElementById(`initials-${taskId}`);
-        const initials = initialsInput ? initialsInput.value.trim() : '';
-        const photoInput = document.getElementById(`photos-${taskId}`);
+        const initials = initialsInput ? initialsInput.value.trim().toUpperCase() : '';
         
+        // Ensure initials are provided if input field exists
+        if (initialsInput && !initials) {
+          alert('Please enter your initials before completing this task.');
+          if (checkbox) checkbox.checked = false;
+          return;
+        }
+
+        const photoInput = document.getElementById(`photos-${taskId}`);
         let photoUrl = null;
         if (photoInput && photoInput.dataset.uploadedUrls) {
           photoUrl = photoInput.dataset.uploadedUrls;
@@ -1851,7 +1858,7 @@
         const { error } = await supabaseClient.from('task_completions').insert([{
           task_id: taskId,
           completed_date: currentSelectedDateISO,
-          initials: initials,
+          initials: initials || 'N/A',
           photo_url: photoUrl
         }]);
 
@@ -1928,40 +1935,44 @@
         const completionMap = new Map();
         (completions || []).forEach(c => completionMap.set(c.task_id, c));
 
-        const completedDetails = [];
+        const completedDetailsText = [];
+        const completedDetailsHtml = [];
         const photoElements = [];
 
         validTasks.forEach(t => {
           if (completionMap.has(t.id)) {
             const comp = completionMap.get(t.id);
-            let line = `• ${t.title}`;
-            if (comp.initials) line += ` [Initials: ${comp.initials}]`;
-
+            const initialsText = comp.initials ? comp.initials : 'N/A';
             const urls = parsePhotoUrls(comp.photo_url);
-            
+
+            let textLine = `• ${t.title} [Initials: ${initialsText}]`;
+            let htmlLine = `<li><strong>${t.title}</strong> &mdash; <span style="color: #FF509F;">Initials: ${initialsText}</span>`;
+
             if (urls.length > 0) {
               urls.forEach((u, i) => {
                 const label = urls.length > 1 ? `Photo ${i + 1}` : 'Photo';
-                line += `\n    📸 ${label}: ${u}`;
+                textLine += `\n    📸 ${label}: ${u}`;
               });
+              htmlLine += `<br><span style="font-size: 0.85em; color: #99C63E;">📸 Photos attached (${urls.length})</span>`;
             }
+            htmlLine += `</li>`;
 
-            completedDetails.push(line);
+            completedDetailsText.push(textLine);
+            completedDetailsHtml.push(htmlLine);
 
             if (urls.length > 0) {
               const photoLinks = urls.map((u, i) => `
-                <div style="margin-top: 4px; margin-bottom: 8px;">
+                <div style="margin-top: 6px; margin-bottom: 10px;">
                   <a href="${u}" target="_blank" style="color: #FF509F; font-weight: bold; text-decoration: underline;">
-                    🖼️ View Photo ${urls.length > 1 ? i + 1 : ''}
-                  </a>
-                  <br>
-                  <img src="${u}" alt="Task Photo" style="max-width: 100%; max-height: 220px; border-radius: 8px; margin-top: 4px; border: 1px solid #FF509F; display: block;" />
+                    🖼️ View High Res Photo ${urls.length > 1 ? i + 1 : ''}
+                  </a><br>
+                  <img src="${u}" alt="Task Photo" style="max-width: 100%; max-height: 250px; border-radius: 8px; margin-top: 4px; border: 2px solid #FF509F; display: block;" />
                 </div>
               `).join('');
 
               photoElements.push(`
-                <div style="margin-bottom: 12px; background: rgba(255,255,255,0.05); padding: 8px; border-radius: 6px;">
-                  <strong style="color: #99C63E;">• ${t.title}:</strong>
+                <div style="margin-bottom: 14px; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; border-left: 4px solid #99C63E;">
+                  <strong style="color: #99C63E; font-size: 1.05em;">• ${t.title} (Initials: ${initialsText}):</strong>
                   ${photoLinks}
                 </div>
               `);
@@ -1970,22 +1981,31 @@
         });
 
         const totalTasks = validTasks.length;
-        const totalCompleted = completedDetails.length;
+        const totalCompleted = completedDetailsText.length;
         const ratePercent = totalTasks > 0 ? Math.round((totalCompleted / totalTasks) * 100) : 0;
+        const rateString = `${ratePercent}% (${totalCompleted}/${totalTasks} Tasks Completed)`;
+
+        const fullSummaryText = `COMPLETION RATE: ${rateString}\n\n` + (completedDetailsText.length > 0 ? completedDetailsText.join('\n') : 'No completed tasks recorded.');
+        const fullSummaryHtml = `<div style="font-size: 1.1em; font-weight: bold; margin-bottom: 12px; color: #99C63E;">Completion Rate: ${rateString}</div><ul>` + (completedDetailsHtml.length > 0 ? completedDetailsHtml.join('') : '<li>No completed tasks recorded.</li>') + `</ul>`;
 
         const templateParams = {
           report_date: currentSelectedDateISO,
-          completion_rate: `${ratePercent}%`,
+          report_day: currentSelectedDay.toUpperCase(),
+          completion_rate: rateString,
+          completed_rate: rateString,
+          rate_percentage: `${ratePercent}%`,
           completed_count: totalCompleted,
           total_count: totalTasks,
-          summary_details: completedDetails.length > 0 ? completedDetails.join('\n') : 'No completed tasks recorded.',
-          photo_gallery: photoElements.length > 0 ? photoElements.join('') : '<span style="color: #A0A0A0;">No photos uploaded today.</span>'
+          summary_details: fullSummaryText,
+          summary_html: fullSummaryHtml,
+          photo_gallery: photoElements.length > 0 ? photoElements.join('') : '<span style="color: #A0A0A0;">No photos uploaded today.</span>',
+          photos: photoElements.length > 0 ? photoElements.join('') : 'No photos uploaded today.'
         };
 
         const activeTemplate = EMAILJS_EOD_TEMPLATE_ID !== 'YOUR_EOD_TEMPLATE_ID' ? EMAILJS_EOD_TEMPLATE_ID : EMAILJS_TEMPLATE_ID;
         await emailjs.send(EMAILJS_SERVICE_ID, activeTemplate, templateParams);
         
-        alert(`✓ EOD summary report dispatched successfully!`);
+        alert(`✓ EOD summary report dispatched successfully!\nCompletion Rate: ${rateString}`);
       } catch (err) {
         alert('Failed to send EOD Email: ' + (err.text || err.message || err));
       }
@@ -2366,80 +2386,111 @@
 
     function applyUserPermissions(user) {
       document.getElementById('user-welcome-email').textContent = user.email;
-      
-      const adminEmails = ['derrimutmanager@flipout.com.au'];
-      const isAdminEmail = adminEmails.includes(user.email.toLowerCase()) || user.email.toLowerCase().includes('admin');
-      const role = (user.user_metadata?.role === 'admin' || isAdminEmail) ? 'admin' : 'supervisor';
-      currentUserRole = role;
+      currentUserRole = user.user_metadata?.role || 'supervisor';
 
-      const roleBadge = document.getElementById('user-role-tag');
-      roleBadge.textContent = role;
+      const tagEl = document.getElementById('user-role-tag');
+      if (tagEl) {
+        tagEl.textContent = currentUserRole.toUpperCase();
+      }
+
+      const adminOnlyElements = document.querySelectorAll('.admin-only');
+      adminOnlyElements.forEach(el => {
+        if (currentUserRole === 'admin') {
+          el.classList.remove('hidden');
+        } else {
+          el.classList.add('hidden');
+        }
+      });
 
       updateTaskFormButtons();
-
-      if (role === 'admin') {
-        document.querySelectorAll('.admin-only').forEach(el => el.classList.remove('hidden'));
-      } else {
-        document.querySelectorAll('.admin-only').forEach(el => el.classList.add('hidden'));
-      }
     }
 
-    function showMainApp() {
+    // SCREEN VIEW SWITCHING HANDLERS
+    window.showMainApp = function() {
       dismissKeyboard();
-      if (backOfficeInactivityTimer) clearTimeout(backOfficeInactivityTimer);
       mainApp.classList.remove('hidden');
       eodReportScreen.classList.add('hidden');
       cashCalculatorScreen.classList.add('hidden');
       adminLoginScreen.classList.add('hidden');
       backOfficeScreen.classList.add('hidden');
-    }
+      selectDay(currentSelectedDay);
+    };
 
-    function showEODReportScreen() {
+    window.showEODReportScreen = function() {
       dismissKeyboard();
-      populateEODReportFields();
       mainApp.classList.add('hidden');
       eodReportScreen.classList.remove('hidden');
       cashCalculatorScreen.classList.add('hidden');
       adminLoginScreen.classList.add('hidden');
       backOfficeScreen.classList.add('hidden');
-    }
+      populateEODReportFields();
+    };
 
-    function showCashCalculatorScreen() {
+    window.showCashCalculatorScreen = function() {
       dismissKeyboard();
       mainApp.classList.add('hidden');
       eodReportScreen.classList.add('hidden');
       cashCalculatorScreen.classList.remove('hidden');
       adminLoginScreen.classList.add('hidden');
       backOfficeScreen.classList.add('hidden');
-    }
+    };
 
-    function showAdminLogin() {
+    window.showAdminLogin = function() {
       dismissKeyboard();
       mainApp.classList.add('hidden');
       eodReportScreen.classList.add('hidden');
       cashCalculatorScreen.classList.add('hidden');
       adminLoginScreen.classList.remove('hidden');
       backOfficeScreen.classList.add('hidden');
-    }
+    };
 
-    function showBackOffice() {
+    window.showBackOffice = async function() {
       dismissKeyboard();
-      resetInactivityTimer();
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (!session) {
+        showAdminLogin();
+        return;
+      }
+      applyUserPermissions(session.user);
       mainApp.classList.add('hidden');
       eodReportScreen.classList.add('hidden');
       cashCalculatorScreen.classList.add('hidden');
       adminLoginScreen.classList.add('hidden');
       backOfficeScreen.classList.remove('hidden');
-    }
+      resetInactivityTimer();
+      loadAdminTasks();
+    };
 
-    // Navigation Event Listeners
-    document.getElementById('show-admin-login-btn').addEventListener('click', showAdminLogin);
+    // NAV BUTTON EVENT LISTENERS
+    document.getElementById('show-admin-login-btn').addEventListener('click', async () => {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (session) {
+        showBackOffice();
+      } else {
+        showAdminLogin();
+      }
+    });
+
     document.getElementById('show-eod-report-btn').addEventListener('click', showEODReportScreen);
     document.getElementById('back-to-app-btn-1').addEventListener('click', showMainApp);
     document.getElementById('back-to-app-btn-2').addEventListener('click', showMainApp);
 
-    // Initialise Application
-    document.addEventListener('DOMContentLoaded', initialiseApp);
+    // DAY SELECTOR CLICK LISTENERS
+    mainDayTabs.forEach(tab => {
+      tab.addEventListener('click', () => selectDay(tab.dataset.day));
+    });
+
+    adminFilterTabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        adminFilterTabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        activeAdminFilter = tab.dataset.filter;
+        renderAdminTaskList();
+      });
+    });
+
+    // Run Initialisation
+    initialiseApp();
   </script>
 </body>
 </html>

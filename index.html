@@ -1600,7 +1600,7 @@
       dismissKeyboard();
       const msgDiv = document.getElementById('eod-submit-msg');
       msgDiv.className = '';
-      msgDiv.textContent = 'Submitting End of Day Report...';
+      msgDiv.textContent = 'Submitting End of Day Report & Sending Email...';
 
       const reportData = {
         date: document.getElementById('eod-date').value,
@@ -1619,6 +1619,7 @@
       };
 
       try {
+        // Save EOD Report to Supabase
         const { error } = await supabaseClient
           .from('eod_reports')
           .insert([reportData]);
@@ -1627,9 +1628,30 @@
           console.warn('Supabase DB Insert Note:', error.message);
         }
 
+        // Dispatch EOD Report Email via EmailJS
+        if (typeof emailjs !== 'undefined' && EMAILJS_PUBLIC_KEY !== 'YOUR_EMAILJS_PUBLIC_KEY') {
+          const templateParams = {
+            report_date: reportData.date,
+            report_day: reportData.day,
+            staff: reportData.staff,
+            float_amount: reportData.float,
+            takings: `$${reportData.takings.toFixed(2)}`,
+            eod_takings: `$${reportData.eod_takings.toFixed(2)}`,
+            total_cash: reportData.total_cash,
+            eftpos_1: `$${reportData.eftpos_1.toFixed(2)}`,
+            eftpos_2: `$${reportData.eftpos_2.toFixed(2)}`,
+            total_eftpos: reportData.total_eftpos,
+            online_booking: `$${reportData.online_booking.toFixed(2)}`,
+            bank_transfer: `$${reportData.bank_transfer.toFixed(2)}`,
+            grand_total: reportData.grand_total
+          };
+
+          await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_EOD_TEMPLATE_ID, templateParams);
+        }
+
         msgDiv.className = 'success-message';
-        msgDiv.textContent = '✓ End of Day Report submitted successfully!';
-        alert(`✓ EOD Report Submitted Successfully!\n\nDate: ${reportData.date}\nStaff: ${reportData.staff}\nTotal: ${reportData.grand_total}`);
+        msgDiv.textContent = '✓ End of Day Report submitted & email dispatched successfully!';
+        alert(`✓ EOD Report Submitted & Email Sent!\n\nDate: ${reportData.date}\nStaff: ${reportData.staff}\nTotal: ${reportData.grand_total}`);
         
         setTimeout(() => {
           showMainApp();
@@ -1637,7 +1659,7 @@
 
       } catch (err) {
         msgDiv.className = 'error-message';
-        msgDiv.textContent = 'Submission error: ' + (err.message || err);
+        msgDiv.textContent = 'Submission error: ' + (err.text || err.message || err);
       }
     }
 
@@ -2391,47 +2413,33 @@
       backOfficeScreen.classList.add('hidden');
     }
 
+    function showAdminLogin() {
+      dismissKeyboard();
+      mainApp.classList.add('hidden');
+      eodReportScreen.classList.add('hidden');
+      cashCalculatorScreen.classList.add('hidden');
+      adminLoginScreen.classList.remove('hidden');
+      backOfficeScreen.classList.add('hidden');
+    }
+
     function showBackOffice() {
       dismissKeyboard();
+      resetInactivityTimer();
       mainApp.classList.add('hidden');
       eodReportScreen.classList.add('hidden');
       cashCalculatorScreen.classList.add('hidden');
       adminLoginScreen.classList.add('hidden');
       backOfficeScreen.classList.remove('hidden');
-      resetInactivityTimer();
-      checkSession();
     }
 
+    // Navigation Event Listeners
+    document.getElementById('show-admin-login-btn').addEventListener('click', showAdminLogin);
     document.getElementById('show-eod-report-btn').addEventListener('click', showEODReportScreen);
-
-    document.getElementById('show-admin-login-btn').addEventListener('click', async () => {
-      dismissKeyboard();
-      const { data: { session } } = await supabaseClient.auth.getSession();
-      if (session) {
-        showBackOffice();
-      } else {
-        mainApp.classList.add('hidden');
-        adminLoginScreen.classList.remove('hidden');
-      }
-    });
-
     document.getElementById('back-to-app-btn-1').addEventListener('click', showMainApp);
     document.getElementById('back-to-app-btn-2').addEventListener('click', showMainApp);
 
-    mainDayTabs.forEach(tab => {
-      tab.addEventListener('click', () => selectDay(tab.dataset.day));
-    });
-
-    adminFilterTabs.forEach(tab => {
-      tab.addEventListener('click', () => {
-        adminFilterTabs.forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-        activeAdminFilter = tab.dataset.filter;
-        renderAdminTaskList();
-      });
-    });
-
-    initialiseApp();
+    // Initialise Application
+    document.addEventListener('DOMContentLoaded', initialiseApp);
   </script>
 </body>
 </html>

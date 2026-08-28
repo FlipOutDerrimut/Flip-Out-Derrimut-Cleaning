@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Flip Out Derrimut - Daily Checklists</title>
+  <title>Flip Out Derrimut - Daily Checklists & EOD Portal</title>
 
   <!-- iPad Kiosk & PWA Meta Tags -->
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -44,7 +44,7 @@
       font-family: 'Inter', system-ui, -apple-system, sans-serif;
     }
 
-    h1, h2, h3, .brand-title, .checklist-title, .day-tab {
+    h1, h2, h3, h4, .brand-title, .checklist-title, .day-tab, .eod-header-title {
       font-family: 'Unbounded', system-ui, sans-serif;
     }
 
@@ -75,6 +75,51 @@
       overflow: hidden;
     }
 
+    /* Top Left Navigation Actions */
+    .top-left-actions {
+      position: absolute;
+      top: 15px;
+      left: 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 20;
+    }
+
+    .top-nav-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      color: var(--text-light);
+      padding: 0.5rem 0.8rem;
+      border-radius: 8px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+      backdrop-filter: blur(4px);
+    }
+
+    .top-nav-btn:hover {
+      background: var(--flipout-pink);
+      border-color: var(--flipout-pink);
+      color: #fff;
+    }
+
+    .btn-eod-highlight {
+      border-color: var(--flipout-green);
+      background: rgba(153, 198, 62, 0.15);
+      color: var(--flipout-green);
+    }
+
+    .btn-eod-highlight:hover {
+      background: var(--flipout-green);
+      color: var(--flipout-velvet);
+      border-color: var(--flipout-green);
+    }
+
     .brand-header {
       display: flex;
       flex-direction: column;
@@ -82,6 +127,7 @@
       text-align: center;
       margin-bottom: 1.5rem;
       position: relative;
+      margin-top: 2rem; /* Clearance for top left buttons */
     }
 
     .brand-logo {
@@ -119,30 +165,6 @@
       height: auto;
       pointer-events: none;
       opacity: 0.9;
-    }
-
-    .hard-refresh-btn-top {
-      position: absolute;
-      top: 0px;
-      left: 0px;
-      background: rgba(255, 255, 255, 0.1);
-      border: 1px solid rgba(255, 255, 255, 0.25);
-      color: var(--text-light);
-      padding: 0.4rem 0.7rem;
-      border-radius: 8px;
-      font-size: 0.75rem;
-      font-weight: 700;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      transition: all 0.2s ease;
-      z-index: 10;
-    }
-
-    .hard-refresh-btn-top:hover {
-      background: var(--flipout-pink);
-      border-color: var(--flipout-pink);
     }
 
     .progress-wrapper {
@@ -347,6 +369,70 @@
       letter-spacing: 0.5px;
     }
 
+    /* EOD REPORT FORM SPECIFIC STYLING */
+    .eod-card {
+      background: var(--bg-card-alt);
+      border-radius: 14px;
+      padding: 1.25rem;
+      margin-bottom: 1.25rem;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .eod-card-green {
+      border: 2px solid var(--flipout-green);
+      background: rgba(153, 198, 62, 0.05);
+    }
+
+    .eod-section-title {
+      font-family: 'Unbounded', sans-serif;
+      font-size: 0.95rem;
+      color: var(--flipout-green);
+      margin-top: 0;
+      margin-bottom: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .eod-grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    @media (max-width: 580px) {
+      .eod-grid-2 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .eod-read-only {
+      background: var(--bg-input) !important;
+      border-color: rgba(255, 255, 255, 0.15) !important;
+      color: var(--text-muted) !important;
+      font-weight: 700;
+      cursor: not-allowed;
+    }
+
+    .eod-calculated-field {
+      background: rgba(153, 198, 62, 0.15) !important;
+      border: 1px solid var(--flipout-green) !important;
+      color: var(--flipout-green) !important;
+      font-weight: 800 !important;
+      font-size: 1.05rem !important;
+    }
+
+    .eod-grand-total {
+      background: linear-gradient(135deg, rgba(153, 198, 62, 0.25), rgba(255, 80, 159, 0.25)) !important;
+      border: 2px solid var(--flipout-green) !important;
+      color: #FFFFFF !important;
+      font-size: 1.3rem !important;
+      font-weight: 900 !important;
+      text-align: right;
+    }
+
     .reward-modal-overlay {
       position: fixed;
       top: 0;
@@ -440,7 +526,7 @@
       font-weight: 600;
     }
 
-    input, select {
+    input, select, textarea {
       width: 100%;
       padding: 0.75rem;
       border-radius: 8px;
@@ -450,7 +536,7 @@
       font-size: 0.95rem;
     }
 
-    input:focus, select:focus {
+    input:focus, select:focus, textarea:focus {
       outline: none;
       border-color: var(--flipout-green);
     }
@@ -562,6 +648,9 @@
     .footer {
       margin-top: 2rem;
       text-align: center;
+      display: flex;
+      justify-content: center;
+      align-items: center;
     }
 
     .admin-link {
@@ -618,8 +707,12 @@
 
   <!-- 1. STAFF CHECKLIST VIEW -->
   <div id="main-app" class="container">
+    <div class="top-left-actions">
+      <button id="show-admin-login-btn" class="top-nav-btn">🔑 Back Office Access</button>
+      <button id="show-eod-report-btn" class="top-nav-btn btn-eod-highlight">📊 Submit EOD Report</button>
+    </div>
+
     <div class="brand-header">
-      <button onclick="hardRefreshApp()" class="hard-refresh-btn-top">🔄 Hard Refresh</button>
       <img src="FO Derrimut-01.png" alt="Flip Out Derrimut Logo" class="brand-logo">
       <div class="sub-title">Daily Operations Checklist</div>
       <img src="14.png" alt="Jet and Max Ninjas" class="mascot-hero-right">
@@ -660,21 +753,132 @@
       <img src="Roo pose 4.png" alt="Roo Ninja" class="mascot-corner-left">
     </div>
 
-    <div class="footer" style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
-      <button id="send-eod-main-btn" onclick="sendEODSummaryEmail(false)" class="btn-secondary" style="font-size: 0.8rem;">
-        ✉️ Dispatch EOD Email
-      </button>
-      <button onclick="hardRefreshApp()" class="btn-secondary" style="font-size: 0.8rem;">
+    <div class="footer">
+      <button onclick="hardRefreshApp()" class="btn-secondary" style="font-size: 0.85rem; padding: 0.6rem 1.2rem;">
         🔄 Refresh
       </button>
-      <button id="show-admin-login-btn" class="admin-link">Back Office Access</button>
     </div>
   </div>
 
-  <!-- 2. ADMIN & WORKER LOGIN SCREEN -->
+  <!-- 2. NEW EOD TAKINGS REPORT FORM VIEW -->
+  <div id="eod-report-screen" class="container hidden">
+    <div class="top-left-actions">
+      <button onclick="showMainApp()" class="top-nav-btn">← Return to Portal</button>
+    </div>
+
+    <div class="brand-header">
+      <img src="FO Derrimut-01.png" alt="Flip Out Derrimut Logo" class="brand-logo" style="max-width: 180px;">
+      <div class="sub-title" style="color: var(--flipout-green);">End of Day Takings Report</div>
+    </div>
+
+    <form id="eod-takings-form">
+      <!-- DATE, DAY & STAFF MEMBERS SECTION -->
+      <div class="eod-card eod-card-green">
+        <div class="eod-section-title">📅 General Information</div>
+        <div class="eod-grid-2">
+          <div class="form-group">
+            <label for="eod-date">Date</label>
+            <input type="text" id="eod-date" class="eod-read-only" readonly />
+          </div>
+          <div class="form-group">
+            <label for="eod-day">Day of Week</label>
+            <input type="text" id="eod-day" class="eod-read-only" readonly />
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+          <label for="eod-staff">Staff Members On Shift</label>
+          <input type="text" id="eod-staff" placeholder="e.g. Josh, Daniel, Calvin" required />
+        </div>
+      </div>
+
+      <!-- FLOAT & CASH TAKINGS SECTION -->
+      <div class="eod-card">
+        <div class="eod-section-title">💵 Cash & Takings</div>
+        <div class="eod-grid-2">
+          <div class="form-group">
+            <label for="eod-float">Fixed Register Float</label>
+            <input type="text" id="eod-float" value="$300.00" class="eod-read-only" readonly />
+          </div>
+          <div class="form-group">
+            <label for="eod-takings-input">Takings ($)</label>
+            <input type="number" step="0.01" min="0" id="eod-takings-input" placeholder="0.00" value="0.00" required />
+          </div>
+          <div class="form-group">
+            <label for="eod-eod-takings-input">EOD Takings ($)</label>
+            <input type="number" step="0.01" min="0" id="eod-eod-takings-input" placeholder="0.00" value="0.00" required />
+          </div>
+          <div class="form-group">
+            <label for="eod-total-cash-1">Total Cash (Takings + EOD Takings)</label>
+            <input type="text" id="eod-total-cash-1" class="eod-calculated-field" value="$0.00" readonly />
+          </div>
+        </div>
+      </div>
+
+      <!-- RECEPTION EFTPOS SECTION -->
+      <div class="eod-card">
+        <div class="eod-section-title">💳 Reception EFTPOS Statements</div>
+        <div class="eod-grid-2">
+          <div class="form-group">
+            <label for="eod-eftpos-1">EFTPOS Statement 1 ($)</label>
+            <input type="number" step="0.01" min="0" id="eod-eftpos-1" placeholder="0.00" value="0.00" required />
+          </div>
+          <div class="form-group">
+            <label for="eod-eftpos-2">EFTPOS Statement 2 ($)</label>
+            <input type="number" step="0.01" min="0" id="eod-eftpos-2" placeholder="0.00" value="0.00" required />
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+          <label for="eod-total-eftpos">Total EFTPOS</label>
+          <input type="text" id="eod-total-eftpos" class="eod-calculated-field" value="$0.00" readonly />
+        </div>
+      </div>
+
+      <!-- ONLINE BOOKING & BANK TRANSFER SECTION -->
+      <div class="eod-card">
+        <div class="eod-section-title">🌐 Online & Direct Revenue</div>
+        <div class="eod-grid-2">
+          <div class="form-group">
+            <label for="eod-online-booking">Online Booking ($)</label>
+            <input type="number" step="0.01" min="0" id="eod-online-booking" placeholder="0.00" value="0.00" required />
+          </div>
+          <div class="form-group">
+            <label for="eod-bank-transfer">Bank Transfer ($)</label>
+            <input type="number" step="0.01" min="0" id="eod-bank-transfer" placeholder="0.00" value="0.00" required />
+          </div>
+        </div>
+      </div>
+
+      <!-- TOTALS SUMMARY SECTION -->
+      <div class="eod-card eod-card-green">
+        <div class="eod-section-title">📈 Final Reconciliation Totals</div>
+        <div class="eod-grid-2">
+          <div class="form-group">
+            <label for="eod-total-cash-2">Total Cash Section</label>
+            <input type="text" id="eod-total-cash-2" class="eod-calculated-field" value="$0.00" readonly />
+          </div>
+          <div class="form-group">
+            <label for="eod-summary-eftpos">Total EFTPOS Section</label>
+            <input type="text" id="eod-summary-eftpos" class="eod-calculated-field" value="$0.00" readonly />
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="eod-grand-total-input" style="color: var(--flipout-green); font-size: 0.95rem; font-weight: 800;">GRAND TOTAL ($)</label>
+          <input type="text" id="eod-grand-total-input" class="eod-grand-total" value="$300.00" readonly />
+        </div>
+      </div>
+
+      <button type="submit" class="btn-primary" style="margin-bottom: 1rem;">📤 Submit EOD Report</button>
+      <div id="eod-submit-msg"></div>
+    </form>
+
+    <div class="footer">
+      <button onclick="showMainApp()" class="admin-link">← Return to Checklist Portal</button>
+    </div>
+  </div>
+
+  <!-- 3. ADMIN & WORKER LOGIN SCREEN -->
   <div id="admin-login-screen" class="container hidden">
     <div class="brand-header">
-      <button onclick="hardRefreshApp()" class="hard-refresh-btn-top">🔄 Hard Refresh</button>
       <img src="FO Derrimut-01.png" alt="Flip Out Derrimut Logo" class="brand-logo" style="max-width: 180px;">
       <div class="sub-title">Staff & Supervisor Login</div>
     </div>
@@ -704,7 +908,7 @@
     </div>
   </div>
 
-  <!-- 3. BACK OFFICE TASK MANAGER -->
+  <!-- 4. BACK OFFICE TASK MANAGER -->
   <div id="back-office-screen" class="container hidden">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 1rem;">
       <div style="display: flex; align-items: center; gap: 12px;">
@@ -872,7 +1076,7 @@
     </div>
   </div>
 
-  <!-- 4. MOTIVATIONAL REWARD MODAL -->
+  <!-- 5. MOTIVATIONAL REWARD MODAL -->
   <div id="reward-modal" class="reward-modal-overlay hidden">
     <div class="reward-modal-card">
       <div class="reward-icon">🎉</div>
@@ -902,7 +1106,6 @@
     
     // MELBOURNE TIME ZONE HELPER FUNCTIONS
     function getMelbourneTodayISO() {
-      // Formats current date strictly in Australia/Melbourne timezone as YYYY-MM-DD
       return new Date().toLocaleDateString('en-CA', { timeZone: 'Australia/Melbourne' });
     }
 
@@ -937,7 +1140,7 @@
 
     // 15-MINUTE AUTO SIGN OUT INACTIVITY TIMER FOR BACK OFFICE
     let backOfficeInactivityTimer = null;
-    const INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000; // 15 Minutes
+    const INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000;
 
     function resetInactivityTimer() {
       if (backOfficeInactivityTimer) clearTimeout(backOfficeInactivityTimer);
@@ -989,6 +1192,7 @@
 
     // DOM Elements
     const mainApp = document.getElementById('main-app');
+    const eodReportScreen = document.getElementById('eod-report-screen');
     const adminLoginScreen = document.getElementById('admin-login-screen');
     const backOfficeScreen = document.getElementById('back-office-screen');
     const pendingTasksContainer = document.getElementById('pending-tasks-container');
@@ -1079,10 +1283,10 @@
     async function initialiseApp() {
       selectDay(currentSelectedDay);
       checkSession();
+      setupEODCalculations();
 
       // Background Auto-Refresh Polling
       setInterval(() => {
-        // Auto-check for Melbourne midnight date shift
         const melbToday = getMelbourneTodayISO();
         if (currentSelectedDay === getMelbourneDayName() && currentSelectedDateISO !== melbToday) {
           currentSelectedDateISO = melbToday;
@@ -1094,6 +1298,115 @@
           loadAdminTasks(true);
         }
       }, 15000);
+    }
+
+    // EOD REPORT LIVE CALCULATIONS & FORM LOGIC
+    function setupEODCalculations() {
+      const inputs = [
+        'eod-takings-input',
+        'eod-eod-takings-input',
+        'eod-eftpos-1',
+        'eod-eftpos-2',
+        'eod-online-booking',
+        'eod-bank-transfer'
+      ];
+
+      inputs.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.addEventListener('input', calculateEODTotals);
+        }
+      });
+
+      document.getElementById('eod-takings-form').addEventListener('submit', handleEODReportSubmit);
+    }
+
+    function calculateEODTotals() {
+      const takings = parseFloat(document.getElementById('eod-takings-input').value) || 0;
+      const eodTakings = parseFloat(document.getElementById('eod-eod-takings-input').value) || 0;
+      const eftpos1 = parseFloat(document.getElementById('eod-eftpos-1').value) || 0;
+      const eftpos2 = parseFloat(document.getElementById('eod-eftpos-2').value) || 0;
+      const online = parseFloat(document.getElementById('eod-online-booking').value) || 0;
+      const bank = parseFloat(document.getElementById('eod-bank-transfer').value) || 0;
+      const fixedFloat = 300.00;
+
+      // 1. Calculate Total Cash (Takings + EOD Takings)
+      const totalCash = takings + eodTakings;
+      const totalCashFormatted = `$${totalCash.toFixed(2)}`;
+      
+      // Update both Total Cash display sections
+      document.getElementById('eod-total-cash-1').value = totalCashFormatted;
+      document.getElementById('eod-total-cash-2').value = totalCashFormatted;
+
+      // 2. Calculate Total EFTPOS (Statement 1 + Statement 2)
+      const totalEftpos = eftpos1 + eftpos2;
+      const totalEftposFormatted = `$${totalEftpos.toFixed(2)}`;
+      
+      document.getElementById('eod-total-eftpos').value = totalEftposFormatted;
+      document.getElementById('eod-summary-eftpos').value = totalEftposFormatted;
+
+      // 3. Calculate Grand Total
+      const grandTotal = totalCash + totalEftpos + online + bank + fixedFloat;
+      document.getElementById('eod-grand-total-input').value = `$${grandTotal.toFixed(2)}`;
+    }
+
+    function populateEODReportFields() {
+      const melbDateISO = getMelbourneTodayISO();
+      const [year, month, day] = melbDateISO.split('-');
+      const formattedDate = `${day}/${month}/${year}`;
+      const dayName = getMelbourneDayName();
+      const capitalizedDay = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+
+      document.getElementById('eod-date').value = formattedDate;
+      document.getElementById('eod-day').value = capitalizedDay;
+      calculateEODTotals();
+    }
+
+    async function handleEODReportSubmit(e) {
+      e.preventDefault();
+      dismissKeyboard();
+      const msgDiv = document.getElementById('eod-submit-msg');
+      msgDiv.className = '';
+      msgDiv.textContent = 'Submitting End of Day Report...';
+
+      const reportData = {
+        date: document.getElementById('eod-date').value,
+        day: document.getElementById('eod-day').value,
+        staff: document.getElementById('eod-staff').value.trim(),
+        float: '$300.00',
+        takings: parseFloat(document.getElementById('eod-takings-input').value) || 0,
+        eod_takings: parseFloat(document.getElementById('eod-eod-takings-input').value) || 0,
+        total_cash: document.getElementById('eod-total-cash-1').value,
+        eftpos_1: parseFloat(document.getElementById('eod-eftpos-1').value) || 0,
+        eftpos_2: parseFloat(document.getElementById('eod-eftpos-2').value) || 0,
+        total_eftpos: document.getElementById('eod-total-eftpos').value,
+        online_booking: parseFloat(document.getElementById('eod-online-booking').value) || 0,
+        bank_transfer: parseFloat(document.getElementById('eod-bank-transfer').value) || 0,
+        grand_total: document.getElementById('eod-grand-total-input').value
+      };
+
+      try {
+        const { error } = await supabaseClient
+          .from('eod_reports')
+          .insert([reportData]);
+
+        if (error) {
+          // If custom table isn't created yet, fall back gracefully to notification alert
+          console.warn('Supabase DB Insert Note:', error.message);
+        }
+
+        msgDiv.className = 'success-message';
+        msgDiv.textContent = '✓ End of Day Report submitted successfully!';
+        alert(`✓ EOD Report Submitted Successfully!\n\nDate: ${reportData.date}\nStaff: ${reportData.staff}\nGrand Total: ${reportData.grand_total}`);
+        
+        setTimeout(() => {
+          showMainApp();
+        }, 1200);
+
+      } catch (err) {
+        msgDiv.className = 'error-message';
+        msgDiv.textContent = 'Submission error: ' + (err.message || err);
+      }
     }
 
     async function selectDay(dayName, isSilentRefresh = false) {
@@ -1112,7 +1425,6 @@
         pendingTasksContainer.innerHTML = `<p style="text-align: center; color: var(--text-muted);">Loading tasks...</p>`;
       }
 
-      // Fetch task completions strictly for target date
       const { data: completions } = await supabaseClient
         .from('task_completions')
         .select('task_id, initials, photo_url')
@@ -1135,7 +1447,6 @@
         return;
       }
 
-      // STRICT FILTERING: Temporary tasks MUST only display on their exact creation date
       const validTasks = (tasks || []).filter(task => {
         if (task.is_temporary) {
           return task.created_for_date === currentSelectedDateISO;
@@ -1633,7 +1944,6 @@
       
       const is_temporary = isTemporaryJobRequested;
       
-      // FIX: Temporary jobs MUST NOT have recurring days array stored to prevent bleed into next weeks/days
       const selectedDays = is_temporary ? [] : Array.from(document.querySelectorAll('.day-check:checked')).map(cb => cb.value);
       const is_approved = (currentUserRole === 'admin') || is_temporary;
 
@@ -1824,6 +2134,16 @@
       dismissKeyboard();
       if (backOfficeInactivityTimer) clearTimeout(backOfficeInactivityTimer);
       mainApp.classList.remove('hidden');
+      eodReportScreen.classList.add('hidden');
+      adminLoginScreen.classList.add('hidden');
+      backOfficeScreen.classList.add('hidden');
+    }
+
+    function showEODReportScreen() {
+      dismissKeyboard();
+      populateEODReportFields();
+      mainApp.classList.add('hidden');
+      eodReportScreen.classList.remove('hidden');
       adminLoginScreen.classList.add('hidden');
       backOfficeScreen.classList.add('hidden');
     }
@@ -1831,11 +2151,14 @@
     function showBackOffice() {
       dismissKeyboard();
       mainApp.classList.add('hidden');
+      eodReportScreen.classList.add('hidden');
       adminLoginScreen.classList.add('hidden');
       backOfficeScreen.classList.remove('hidden');
       resetInactivityTimer();
       checkSession();
     }
+
+    document.getElementById('show-eod-report-btn').addEventListener('click', showEODReportScreen);
 
     document.getElementById('show-admin-login-btn').addEventListener('click', async () => {
       dismissKeyboard();

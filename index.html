@@ -885,7 +885,7 @@
         </div>
         <div class="form-group" style="margin-bottom: 0;">
           <label for="eod-staff">Staff Member/s:</label>
-          <input type="text" id="eod-staff" placeholder="e.g. Joshua, Stephanie, Maryann" required />
+          <input type="text" id="eod-staff" placeholder="e.g. ua, Stephanie, Maryann" required />
         </div>
       </div>
 
@@ -2245,7 +2245,7 @@
             </label>
           </div>
           <div class="task-meta">
-            ${task.requires_initials ? `<input type="text" class="initials-input" id="initials-${task.id}" value="${savedInitials || ''}" placeholder="Name (e.g. Josh T)" maxlength="25" ${isDone ? 'disabled' : ''}>` : ''}
+            ${task.requires_initials ? `<input type="text" class="initials-input" id="initials-${task.id}" value="${savedInitials || ''}" placeholder="Name + Initial" maxlength="25" ${isDone ? 'disabled' : ''}>` : ''}
             ${task.requires_photo ? `
               <label class="photo-upload-btn" ${isDone ? 'style="display:none;"' : ''}>
                 📷 ${photoUrls.length > 0 ? 'Upload More Photos' : `Upload Photos (Max ${maxPhotos})`}

@@ -1132,46 +1132,6 @@
       </div>
     </div>
 
-    <!-- EOD QUESTIONS MANAGER SECTION -->
-    <div style="margin-bottom: 2rem; background: var(--bg-card-alt); padding: 1.25rem; border-radius: 12px; border: 1px solid rgba(255,80,159,0.3);">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-        <h3 style="margin: 0; color: var(--flipout-pink); font-size: 1.1rem; font-family: 'Unbounded', sans-serif;">❓ Manage EOD Report Questions</h3>
-        <button onclick="loadBackOfficeQuestions()" class="btn-secondary btn-small">🔄 Refresh Questions</button>
-      </div>
-
-      <form id="eod-question-form" style="margin-bottom: 1.25rem; background: var(--bg-input); padding: 1rem; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);">
-        <input type="hidden" id="editing-question-id" value="" />
-        <div class="form-group">
-          <label for="new-question-text">Question Text</label>
-          <input type="text" id="new-question-text" placeholder="e.g. Were all party rooms cleaned & re-stocked?" required />
-        </div>
-        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-          <div class="form-group" style="flex: 1; min-width: 160px;">
-            <label for="new-question-type">Input Type</label>
-            <select id="new-question-type">
-              <option value="text">Short Text</option>
-              <option value="textarea">Detailed Response</option>
-              <option value="boolean">Yes / No</option>
-            </select>
-          </div>
-          <div class="form-group" style="flex: 1; min-width: 140px; display: flex; align-items: flex-end;">
-            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 0.75rem;">
-              <input type="checkbox" id="new-question-active" checked style="width: auto;"> Active Question
-            </label>
-          </div>
-        </div>
-        <div style="display: flex; gap: 10px;">
-          <button type="submit" id="save-question-btn" class="btn-primary" style="flex: 1;">+ Add Question</button>
-          <button type="button" id="cancel-question-edit-btn" onclick="cancelEditQuestion()" class="btn-danger hidden">Cancel Edit</button>
-        </div>
-        <div id="question-form-msg"></div>
-      </form>
-
-      <div id="backoffice-questions-list">
-        <p style="text-align: center; color: var(--text-muted);">Loading questions...</p>
-      </div>
-    </div>
-
     <div id="approval-queue-section" class="approval-window hidden">
       <h3 style="margin-top: 0; margin-bottom: 0.5rem; font-size: 1.1rem; color: var(--warning);">📥 Pending Permanent Job Requests (Admin Approval)</h3>
       <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Review supervisor submissions below. Click "Approve" to publish permanently or "Reject" to discard.</p>
@@ -1583,7 +1543,6 @@
       resetInactivityTimer();
       loadAdminTasks();
       loadStaffPerformance();
-      loadBackOfficeQuestions();
     };
 
     // LEADERBOARD MODAL CONTROLLERS
@@ -1748,11 +1707,6 @@
       setupEODCalculations();
       setupAuthListeners();
 
-      const qForm = document.getElementById('eod-question-form');
-      if (qForm) {
-        qForm.addEventListener('submit', handleQuestionFormSubmit);
-      }
-
       // 12:00AM MIDNIGHT AUTOMATIC RESET & POLLING CHECKER
       setInterval(() => {
         const melbToday = getMelbourneTodayISO();
@@ -1772,7 +1726,6 @@
         } else if (!backOfficeScreen.classList.contains('hidden')) {
           loadAdminTasks(true);
           loadStaffPerformance(true);
-          loadBackOfficeQuestions(true);
         }
       }, 10000);
     }
@@ -2274,12 +2227,12 @@
     window.handleTaskPhotoSelect = async function(fileInput, taskId, maxPhotos = 1) {
       dismissKeyboard();
       const files = Array.from(fileInput.files);
-      if (!files || files.length === 0) return;
+      if (!files || files.length === 0) return null;
 
       if (files.length > maxPhotos) {
         alert(`You can upload a maximum of ${maxPhotos} photo(s) for this task.`);
         fileInput.value = '';
-        return;
+        return null;
       }
 
       const statusSpan = document.getElementById(`photo-filename-${taskId}`);
@@ -2289,7 +2242,7 @@
 
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const filePath = `completions/${Date.now()}_${i}_${file.name}`;
+        const filePath = `completions/${Date.now()}_${i}_${file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_')}`;
 
         const { data, error } = await supabaseClient
           .storage
@@ -2307,67 +2260,68 @@
           .from('task-photos')
           .getPublicUrl(filePath);
 
-        uploadedUrls.push(publicUrlData.publicUrl);
+        if (publicUrlData && publicUrlData.publicUrl) {
+          uploadedUrls.push(publicUrlData.publicUrl);
+        }
       }
 
-      fileInput.dataset.uploadedUrls = JSON.stringify(uploadedUrls);
-
-      if (statusSpan) {
-        const linksHtml = uploadedUrls.map((url, i) => 
-          `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color: var(--flipout-pink); text-decoration: underline; margin-left: 4px;">[Photo ${uploadedUrls.length > 1 ? i + 1 : ''}]</a>`
-        ).join(' ');
-        statusSpan.innerHTML = `✓ ${uploadedUrls.length} Photo(s) Ready! ${linksHtml}`;
-      }
+      if (statusSpan) statusSpan.textContent = `✓ ${uploadedUrls.length} photo(s) ready`;
       return uploadedUrls;
     };
 
     window.toggleTaskComplete = async function(taskId, isChecked) {
       dismissKeyboard();
-      const initialsInput = document.getElementById(`initials-${taskId}`);
-      const photoInput = document.getElementById(`photos-${taskId}`);
-
-      const task = allLoadedTasks.find(t => t.id == taskId);
+      const task = allLoadedTasks.find(t => String(t.id) === String(taskId));
+      if (!task) return;
 
       if (isChecked) {
-        let rawInitials = initialsInput ? initialsInput.value.trim() : '';
-        if (task && task.requires_initials && !rawInitials) {
-          alert('Please enter your name/initials (e.g. Josh T) before ticking off this task.');
-          document.getElementById(`task-${taskId}`).checked = false;
-          if (initialsInput) initialsInput.focus();
-          return;
+        let initials = '';
+        if (task.requires_initials) {
+          const initialsInput = document.getElementById(`initials-${taskId}`);
+          initials = initialsInput ? initialsInput.value.trim() : '';
+          if (!initials) {
+            alert('Please enter your Name + Initial before marking this task complete.');
+            document.getElementById(`task-${taskId}`).checked = false;
+            return;
+          }
         }
 
         let photoUrls = [];
-        if (photoInput && photoInput.dataset.uploadedUrls) {
-          try {
-            photoUrls = JSON.parse(photoInput.dataset.uploadedUrls);
-          } catch (e) {}
+        if (task.requires_photo) {
+          const fileInput = document.getElementById(`photos-${taskId}`);
+          if (fileInput && fileInput.files && fileInput.files.length > 0) {
+            const uploaded = await handleTaskPhotoSelect(fileInput, taskId, task.max_photos || 1);
+            if (!uploaded || uploaded.length === 0) {
+              document.getElementById(`task-${taskId}`).checked = false;
+              return;
+            }
+            photoUrls = uploaded;
+          } else {
+            alert('Please select/take photo(s) before marking this task as complete.');
+            document.getElementById(`task-${taskId}`).checked = false;
+            return;
+          }
         }
 
-        if (task && task.requires_photo && photoUrls.length === 0) {
-          alert('Please upload at least 1 photo for this task before checking it off.');
-          document.getElementById(`task-${taskId}`).checked = false;
-          return;
-        }
-
-        const completionPayload = {
+        const completionRecord = {
           task_id: taskId,
           completed_date: currentSelectedDateISO,
-          initials: rawInitials || 'STAFF',
+          initials: initials,
           photo_url: photoUrls.length > 0 ? JSON.stringify(photoUrls) : null
         };
 
         const { error } = await supabaseClient
           .from('task_completions')
-          .upsert([completionPayload], { onConflict: 'task_id,completed_date' });
+          .insert([completionRecord]);
 
         if (error) {
-          alert('Error updating task: ' + error.message);
+          alert('Failed to save completion: ' + error.message);
           document.getElementById(`task-${taskId}`).checked = false;
           return;
         }
 
         triggerRewardEffect();
+        selectDay(currentSelectedDay, true);
       } else {
         const { error } = await supabaseClient
           .from('task_completions')
@@ -2376,25 +2330,98 @@
           .eq('completed_date', currentSelectedDateISO);
 
         if (error) {
-          alert('Error unchecking task: ' + error.message);
+          alert('Failed to uncheck task: ' + error.message);
           document.getElementById(`task-${taskId}`).checked = true;
           return;
         }
-      }
 
-      selectDay(currentSelectedDay, true);
+        selectDay(currentSelectedDay, true);
+      }
     };
 
-    // BACK OFFICE TASK FORM HANDLER
-    window.handleTaskFormSubmit = async function(isTemporary) {
-      dismissKeyboard();
-      const editingId = document.getElementById('editing-task-id').value;
-      const title = document.getElementById('new-task-title').value.trim();
-      const category = document.getElementById('new-task-category').value;
-      const maxPhotos = parseInt(document.getElementById('new-task-photos-count').value) || 1;
-      const requiresPhoto = document.getElementById('new-task-photo').checked;
-      const requiresInitials = document.getElementById('new-task-initials').checked;
+    async function loadAdminTasks(isSilent = false) {
+      if (!isSilent) {
+        adminTaskList.innerHTML = `<p style="text-align: center; color: var(--text-muted);">Loading tasks...</p>`;
+      }
 
+      // 1. Pending unapproved permanent tasks
+      const { data: pendingTasks } = await supabaseClient
+        .from('tasks')
+        .select('*')
+        .eq('is_approved', false)
+        .order('created_at', { ascending: false });
+
+      if (approvalQueueSection && approvalTaskList) {
+        if (pendingTasks && pendingTasks.length > 0) {
+          approvalQueueSection.classList.remove('hidden');
+          approvalTaskList.innerHTML = pendingTasks.map(task => `
+            <div class="admin-task-item">
+              <div>
+                <strong>${task.title}</strong>
+                <div style="font-size:0.75rem; color: var(--text-muted); margin-top:2px;">
+                  Category: ${task.category} | Days: ${(task.days || []).join(', ')}
+                </div>
+              </div>
+              <div class="admin-actions">
+                <button onclick="approveTask('${task.id}')" class="btn-success btn-small">Approve</button>
+                <button onclick="rejectTask('${task.id}')" class="btn-danger btn-small">Reject</button>
+              </div>
+            </div>
+          `).join('');
+        } else {
+          approvalQueueSection.classList.add('hidden');
+          approvalTaskList.innerHTML = '';
+        }
+      }
+
+      // 2. Active approved tasks
+      const { data: tasks, error } = await supabaseClient
+        .from('tasks')
+        .select('*')
+        .eq('is_approved', true)
+        .order('sort_order', { ascending: true });
+
+      if (error) {
+        if (!isSilent) adminTaskList.innerHTML = `<p class="error-message">Error loading tasks: ${error.message}</p>`;
+        return;
+      }
+
+      let filtered = tasks || [];
+      if (activeAdminFilter !== 'all') {
+        filtered = filtered.filter(t => t.days && t.days.includes(activeAdminFilter));
+      }
+
+      if (filtered.length === 0) {
+        adminTaskList.innerHTML = `<p style="text-align: center; color: var(--text-muted);">No tasks match the selected filter.</p>`;
+        return;
+      }
+
+      adminTaskList.innerHTML = filtered.map(task => `
+        <div class="admin-task-item">
+          <div>
+            <strong>${task.title} ${task.is_temporary ? '<span class="badge-temp">Today Only</span>' : ''}</strong>
+            <div style="font-size:0.75rem; color: var(--text-muted); margin-top:2px;">
+              Category: ${task.category} | Days: ${(task.days || []).join(', ') || 'None'} | Photos: ${task.requires_photo ? `Max ${task.max_photos || 1}` : 'No'} | Name: ${task.requires_initials ? 'Yes' : 'No'}
+            </div>
+          </div>
+          <div class="admin-actions">
+            <button onclick="editTask('${task.id}')" class="btn-secondary btn-small">Edit</button>
+            <button onclick="deleteTask('${task.id}')" class="btn-danger btn-small">Delete</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    window.handleTaskFormSubmit = async function(isTemporary = false) {
+      dismissKeyboard();
+      const titleInput = document.getElementById('new-task-title');
+      const categoryInput = document.getElementById('new-task-category');
+      const photosCountInput = document.getElementById('new-task-photos-count');
+      const photoCheck = document.getElementById('new-task-photo');
+      const initialsCheck = document.getElementById('new-task-initials');
+      const editingId = document.getElementById('editing-task-id').value;
+
+      const title = titleInput.value.trim();
       if (!title) {
         alert('Please enter a task description.');
         return;
@@ -2403,136 +2430,70 @@
       const selectedDays = [];
       document.querySelectorAll('.day-check:checked').forEach(cb => selectedDays.push(cb.value));
 
-      if (!isTemporary && selectedDays.length === 0) {
-        alert('Please select at least one active day for a permanent task.');
+      if (!isTemporary && selectedDays.length === 0 && !editingId) {
+        alert('Please select at least one active day for permanent tasks.');
         return;
       }
 
-      const isApproved = (currentUserRole === 'admin' || isTemporary);
-
-      const taskPayload = {
-        title,
-        category,
-        max_photos: maxPhotos,
-        requires_photo: requiresPhoto,
-        requires_initials: requiresInitials,
+      const taskData = {
+        title: title,
+        category: categoryInput.value,
+        requires_photo: photoCheck.checked,
+        max_photos: parseInt(photosCountInput.value) || 1,
+        requires_initials: initialsCheck.checked,
+        days: isTemporary ? [currentSelectedDay] : selectedDays,
         is_temporary: isTemporary,
-        days: isTemporary ? [getMelbourneDayName()] : selectedDays,
-        created_for_date: isTemporary ? getMelbourneTodayISO() : null,
-        is_approved: isApproved
+        created_for_date: isTemporary ? currentSelectedDateISO : null,
+        is_approved: currentUserRole === 'admin' || isTemporary
       };
 
-      let error = null;
       if (editingId) {
-        const { error: err } = await supabaseClient
+        const { error } = await supabaseClient
           .from('tasks')
-          .update(taskPayload)
+          .update(taskData)
           .eq('id', editingId);
-        error = err;
+
+        if (error) {
+          alert('Error updating task: ' + error.message);
+        } else {
+          alert('✓ Task updated successfully.');
+          cancelEditTask();
+          loadAdminTasks();
+        }
       } else {
-        const { error: err } = await supabaseClient
+        const { error } = await supabaseClient
           .from('tasks')
-          .insert([taskPayload]);
-        error = err;
-      }
+          .insert([taskData]);
 
-      if (error) {
-        alert('Error saving task: ' + error.message);
-      } else {
-        alert(isApproved ? '✓ Job saved successfully!' : '📩 Permanent job request submitted for Admin approval!');
-        cancelEditTask();
-        loadAdminTasks();
+        if (error) {
+          alert('Error adding task: ' + error.message);
+        } else {
+          alert(taskData.is_approved ? '✓ Task created successfully!' : '📩 Task submitted for admin approval.');
+          document.getElementById('task-form').reset();
+          document.getElementById('new-task-initials').checked = true;
+          loadAdminTasks();
+        }
       }
     };
 
-    window.cancelEditTask = function() {
-      document.getElementById('editing-task-id').value = '';
-      document.getElementById('task-form').reset();
-      document.getElementById('form-heading').textContent = 'Add Job';
-      document.getElementById('cancel-edit-btn').classList.add('hidden');
-    };
-
-    window.filterAdminTasks = function(filterDay, btnEl) {
-      activeAdminFilter = filterDay;
-      adminFilterTabs.forEach(t => t.classList.remove('active'));
-      btnEl.classList.add('active');
-      loadAdminTasks();
-    };
-
-    window.loadAdminTasks = async function(isSilent = false) {
-      if (!isSilent) {
-        adminTaskList.innerHTML = `<p style="text-align: center; color: var(--text-muted);">Loading tasks...</p>`;
-      }
-
-      const { data: tasks, error } = await supabaseClient
+    window.editTask = async function(taskId) {
+      const { data: task, error } = await supabaseClient
         .from('tasks')
         .select('*')
-        .order('id', { ascending: false });
-
-      if (error) {
-        adminTaskList.innerHTML = `<p class="error-message">Error loading tasks: ${error.message}</p>`;
-        return;
-      }
-
-      const unapproved = tasks.filter(t => !t.is_approved);
-      if (unapproved.length > 0 && currentUserRole === 'admin') {
-        approvalQueueSection.classList.remove('hidden');
-        approvalTaskList.innerHTML = unapproved.map(t => `
-          <div class="admin-task-item">
-            <div>
-              <strong>${t.title}</strong> <span style="font-size:0.75rem; color: var(--text-muted);">(${t.category})</span><br>
-              <span style="font-size:0.75rem; color: var(--warning);">Days: ${(t.days || []).join(', ')}</span>
-            </div>
-            <div class="admin-actions">
-              <button onclick="approveTask('${t.id}')" class="btn-success btn-small">Approve</button>
-              <button onclick="rejectTask('${t.id}')" class="btn-danger btn-small">Reject</button>
-            </div>
-          </div>
-        `).join('');
-      } else {
-        approvalQueueSection.classList.add('hidden');
-      }
-
-      const approved = tasks.filter(t => t.is_approved);
-      const filtered = approved.filter(t => {
-        if (activeAdminFilter === 'all') return true;
-        return t.days && t.days.includes(activeAdminFilter);
-      });
-
-      if (filtered.length === 0) {
-        adminTaskList.innerHTML = `<p style="text-align: center; color: var(--text-muted);">No active tasks found for filter.</p>`;
-        return;
-      }
-
-      adminTaskList.innerHTML = filtered.map(t => `
-        <div class="admin-task-item">
-          <div>
-            <strong>${t.title}</strong> ${t.is_temporary ? '<span class="badge-temp">Today Only</span>' : ''}<br>
-            <span style="font-size:0.75rem; color: var(--text-muted);">Category: ${t.category} | Days: ${(t.days || []).join(', ')}</span>
-          </div>
-          <div class="admin-actions">
-            <button onclick="editTask('${t.id}')" class="btn-secondary btn-small">Edit</button>
-            <button onclick="deleteTask('${t.id}')" class="btn-danger btn-small">Delete</button>
-          </div>
-        </div>
-      `).join('');
-    };
-
-    window.editTask = async function(id) {
-      const { data: task } = await supabaseClient
-        .from('tasks')
-        .select('*')
-        .eq('id', id)
+        .eq('id', taskId)
         .single();
 
-      if (!task) return;
+      if (error || !task) {
+        alert('Could not load task details.');
+        return;
+      }
 
       document.getElementById('editing-task-id').value = task.id;
       document.getElementById('new-task-title').value = task.title;
       document.getElementById('new-task-category').value = task.category || 'Opening';
-      document.getElementById('new-task-photos-count').value = task.max_photos || 1;
-      document.getElementById('new-task-photo').checked = task.requires_photo;
-      document.getElementById('new-task-initials').checked = task.requires_initials;
+      document.getElementById('new-task-photos-count').value = String(task.max_photos || 1);
+      document.getElementById('new-task-photo').checked = !!task.requires_photo;
+      document.getElementById('new-task-initials').checked = !!task.requires_initials;
 
       document.querySelectorAll('.day-check').forEach(cb => {
         cb.checked = (task.days || []).includes(cb.value);
@@ -2540,214 +2501,145 @@
 
       document.getElementById('form-heading').textContent = 'Edit Job';
       document.getElementById('cancel-edit-btn').classList.remove('hidden');
+      window.scrollTo({ top: document.getElementById('task-form').offsetTop, behavior: 'smooth' });
     };
 
-    window.deleteTask = async function(id) {
+    window.cancelEditTask = function() {
+      document.getElementById('editing-task-id').value = '';
+      document.getElementById('task-form').reset();
+      document.getElementById('new-task-initials').checked = true;
+      document.getElementById('form-heading').textContent = 'Add Job';
+      document.getElementById('cancel-edit-btn').classList.add('hidden');
+    };
+
+    window.deleteTask = async function(taskId) {
       if (!confirm('Are you sure you want to delete this task?')) return;
-      await supabaseClient.from('tasks').delete().eq('id', id);
-      loadAdminTasks();
-    };
 
-    window.approveTask = async function(id) {
-      await supabaseClient.from('tasks').update({ is_approved: true }).eq('id', id);
-      loadAdminTasks();
-    };
-
-    window.rejectTask = async function(id) {
-      if (!confirm('Reject and delete this job request?')) return;
-      await supabaseClient.from('tasks').delete().eq('id', id);
-      loadAdminTasks();
-    };
-
-    // EOD QUESTIONS BACK OFFICE MANAGER
-    window.loadBackOfficeQuestions = async function(isSilent = false) {
-      const listDiv = document.getElementById('backoffice-questions-list');
-      if (!isSilent && listDiv) {
-        listDiv.innerHTML = `<p style="text-align: center; color: var(--text-muted);">Loading operational questions...</p>`;
-      }
-
-      const { data: questions, error } = await supabaseClient
-        .from('eod_questions')
-        .select('*')
-        .order('id', { ascending: true });
-
-      if (error || !questions || questions.length === 0) {
-        if (listDiv) listDiv.innerHTML = `<p style="text-align: center; color: var(--text-muted);">No operational questions configured.</p>`;
-        return;
-      }
-
-      if (listDiv) {
-        listDiv.innerHTML = questions.map((q, i) => `
-          <div class="admin-task-item">
-            <div>
-              <strong>${i + 1}. ${q.question_text}</strong><br>
-              <span style="font-size:0.75rem; color: var(--text-muted);">Type: ${q.question_type} | Status: ${q.is_active ? '🟢 Active' : '🔴 Inactive'}</span>
-            </div>
-            <div class="admin-actions">
-              <button onclick="editQuestion('${q.id}')" class="btn-secondary btn-small">Edit</button>
-              <button onclick="deleteQuestion('${q.id}')" class="btn-danger btn-small">Delete</button>
-            </div>
-          </div>
-        `).join('');
-      }
-    };
-
-    window.handleQuestionFormSubmit = async function(e) {
-      e.preventDefault();
-      dismissKeyboard();
-      const qId = document.getElementById('editing-question-id').value;
-      const text = document.getElementById('new-question-text').value.trim();
-      const type = document.getElementById('new-question-type').value;
-      const active = document.getElementById('new-question-active').checked;
-      const msgDiv = document.getElementById('question-form-msg');
-
-      if (!text) return;
-
-      const payload = {
-        question_text: text,
-        question_type: type,
-        is_active: active
-      };
-
-      let error = null;
-      if (qId) {
-        const { error: err } = await supabaseClient.from('eod_questions').update(payload).eq('id', qId);
-        error = err;
-      } else {
-        const { error: err } = await supabaseClient.from('eod_questions').insert([payload]);
-        error = err;
-      }
+      const { error } = await supabaseClient
+        .from('tasks')
+        .delete()
+        .eq('id', taskId);
 
       if (error) {
-        msgDiv.className = 'error-message';
-        msgDiv.textContent = 'Error: ' + error.message;
+        alert('Error deleting task: ' + error.message);
       } else {
-        msgDiv.className = 'success-message';
-        msgDiv.textContent = '✓ Question saved successfully!';
-        cancelEditQuestion();
-        loadBackOfficeQuestions();
+        loadAdminTasks();
       }
     };
 
-    window.editQuestion = async function(id) {
-      const { data: q } = await supabaseClient.from('eod_questions').select('*').eq('id', id).single();
-      if (!q) return;
+    window.approveTask = async function(taskId) {
+      const { error } = await supabaseClient
+        .from('tasks')
+        .update({ is_approved: true })
+        .eq('id', taskId);
 
-      document.getElementById('editing-question-id').value = q.id;
-      document.getElementById('new-question-text').value = q.question_text;
-      document.getElementById('new-question-type').value = q.question_type || 'text';
-      document.getElementById('new-question-active').checked = q.is_active;
-
-      document.getElementById('save-question-btn').textContent = 'Update Question';
-      document.getElementById('cancel-question-edit-btn').classList.remove('hidden');
+      if (error) alert('Approval error: ' + error.message);
+      else loadAdminTasks();
     };
 
-    window.cancelEditQuestion = function() {
-      document.getElementById('editing-question-id').value = '';
-      document.getElementById('eod-question-form').reset();
-      document.getElementById('new-question-active').checked = true;
-      document.getElementById('save-question-btn').textContent = '+ Add Question';
-      document.getElementById('cancel-question-edit-btn').classList.add('hidden');
+    window.rejectTask = async function(taskId) {
+      if (!confirm('Reject and delete this job request?')) return;
+      deleteTask(taskId);
     };
 
-    window.deleteQuestion = async function(id) {
-      if (!confirm('Are you sure you want to delete this question?')) return;
-      await supabaseClient.from('eod_questions').delete().eq('id', id);
-      loadBackOfficeQuestions();
+    window.filterAdminTasks = function(dayFilter, btnEl) {
+      activeAdminFilter = dayFilter;
+      adminFilterTabs.forEach(t => t.classList.remove('active'));
+      if (btnEl) btnEl.classList.add('active');
+      loadAdminTasks();
     };
 
-    // STAFF PERFORMANCE METRICS & LEADERBOARD AGGREGATOR
-    window.loadStaffPerformance = async function(isSilent = false) {
-      const container = document.getElementById('staff-performance-container');
-      const modalContainer = document.getElementById('modal-staff-performance-container');
+    async function loadStaffPerformance(isSilent = false) {
+      const container = document.getElementById('modal-staff-performance-container');
+      if (!container && !isSilent) return;
 
-      if (!isSilent && container) {
-        container.innerHTML = `<p style="text-align: center; color: var(--text-muted);">Loading staff performance statistics...</p>`;
-      }
-      if (!isSilent && modalContainer) {
-        modalContainer.innerHTML = `<p style="text-align: center; color: var(--text-muted);">Loading leaderboard...</p>`;
-      }
+      const mondayISO = getDateForDayOfWeek('monday');
+      const sundayISO = getDateForDayOfWeek('sunday');
 
       const { data: completions, error } = await supabaseClient
         .from('task_completions')
         .select('initials, completed_date')
-        .order('completed_date', { ascending: false });
+        .gte('completed_date', mondayISO)
+        .lte('completed_date', sundayISO);
 
-      if (error || !completions || completions.length === 0) {
-        const emptyHtml = `<p style="text-align: center; color: var(--text-muted); padding: 1rem;">No task completion activity recorded yet.</p>`;
-        if (container) container.innerHTML = emptyHtml;
-        if (modalContainer) modalContainer.innerHTML = emptyHtml;
+      if (error) {
+        if (container) container.innerHTML = `<p class="error-message">Error loading leaderboard: ${error.message}</p>`;
         return;
       }
 
-      const countsMap = new Map();
-      completions.forEach(c => {
-        const parsed = parseInitials(c.initials);
-        parsed.forEach(name => {
-          const formattedName = name.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
-          countsMap.set(formattedName, (countsMap.get(formattedName) || 0) + 1);
+      const tallyMap = new Map();
+      (completions || []).forEach(c => {
+        const names = parseInitials(c.initials);
+        names.forEach(name => {
+          tallyMap.set(name, (tallyMap.get(name) || 0) + 1);
         });
       });
 
-      const sortedStaff = Array.from(countsMap.entries()).sort((a, b) => b[1] - a[1]);
+      const sorted = Array.from(tallyMap.entries()).sort((a, b) => b[1] - a[1]);
 
-      if (sortedStaff.length === 0) {
-        const emptyHtml = `<p style="text-align: center; color: var(--text-muted); padding: 1rem;">No valid staff name entries found.</p>`;
-        if (container) container.innerHTML = emptyHtml;
-        if (modalContainer) modalContainer.innerHTML = emptyHtml;
+      if (!container) return;
+
+      if (sorted.length === 0) {
+        container.innerHTML = `<p style="text-align: center; color: var(--text-muted); padding: 1rem;">No task completions recorded yet for this week.</p>`;
         return;
       }
 
       const medals = ['🥇', '🥈', '🥉'];
-      let listHtml = sortedStaff.map(([name, count], index) => {
-        const medal = medals[index] || `<strong>#${index + 1}</strong>`;
+      container.innerHTML = sorted.map(([name, count], index) => {
+        const medal = index < 3 ? medals[index] : `#${index + 1}`;
         return `
-          <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; margin-bottom: 0.5rem; background: var(--bg-input); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+          <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-card-alt); padding: 0.85rem 1rem; border-radius: 10px; margin-bottom: 0.5rem; border: 1px solid rgba(255,255,255,0.05);">
             <div style="display: flex; align-items: center; gap: 10px;">
-              <span style="font-size: 1.2rem;">${medal}</span>
-              <span style="font-weight: 700; color: #FFFFFF; font-size: 0.95rem;">${name}</span>
+              <span style="font-size: 1.2rem; font-weight: bold; width: 28px;">${medal}</span>
+              <strong style="color: #FFFFFF; font-size: 1rem;">${name}</strong>
             </div>
-            <span style="background: rgba(153, 198, 62, 0.2); border: 1px solid var(--flipout-green); color: var(--flipout-green); font-weight: 800; padding: 4px 10px; border-radius: 12px; font-size: 0.85rem;">
-              ${count} task${count === 1 ? '' : 's'}
+            <span style="background: rgba(153,198,62,0.2); color: var(--flipout-green); border: 1px solid var(--flipout-green); padding: 4px 10px; border-radius: 12px; font-weight: bold; font-size: 0.85rem;">
+              ${count} ${count === 1 ? 'task' : 'tasks'}
             </span>
           </div>
         `;
       }).join('');
+    }
 
-      if (container) container.innerHTML = listHtml;
-      if (modalContainer) modalContainer.innerHTML = listHtml;
+    window.sendEODSummaryEmail = async function(isAuto = false) {
+      dismissKeyboard();
+      showEODReportScreen();
     };
 
     window.exportCompletionsToCSV = async function() {
+      dismissKeyboard();
+      const mondayISO = getDateForDayOfWeek('monday');
+      const sundayISO = getDateForDayOfWeek('sunday');
+
       const { data: completions, error } = await supabaseClient
         .from('task_completions')
-        .select('*')
-        .order('completed_date', { ascending: false });
+        .select('id, task_id, completed_date, initials, photo_url, created_at')
+        .gte('completed_date', mondayISO)
+        .lte('completed_date', sundayISO);
 
       if (error || !completions || completions.length === 0) {
-        alert('No completion records available to export.');
+        alert('No completion records found to export for this week.');
         return;
       }
 
-      let csv = 'Task ID,Completed Date,Staff Name / Initials,Photo URL\n';
+      let csv = 'ID,Task ID,Date,Staff,Photo URLs,Submitted At\n';
       completions.forEach(c => {
-        csv += `"${c.task_id}","${c.completed_date}","${(c.initials || '').replace(/"/g, '""')}","${(c.photo_url || '').replace(/"/g, '""')}"\n`;
+        const photos = parsePhotoUrls(c.photo_url).join(' | ');
+        const safeInitials = `"${(c.initials || '').replace(/"/g, '""')}"`;
+        csv += `"${c.id}","${c.task_id}","${c.completed_date}",${safeInitials},"${photos}","${c.created_at}"\n`;
       });
 
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `FlipOut_Completions_${getMelbourneTodayISO()}.csv`;
-      a.click();
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `FlipOut_Completions_${mondayISO}_to_${sundayISO}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     };
 
-    window.sendEODSummaryEmail = async function(isAuto = false) {
-      if (!isAuto) alert('Triggering EOD Report generation...');
-    };
-
-    // Initialise on DOM Ready
-    document.addEventListener('DOMContentLoaded', initialiseApp);
+    window.onload = initialiseApp;
   </script>
 </body>
 </html>

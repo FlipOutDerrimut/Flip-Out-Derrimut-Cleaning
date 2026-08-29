@@ -1132,17 +1132,6 @@
       </div>
     </div>
 
-    <!-- STAFF PERFORMANCE METRICS & LEADERBOARD SECTION -->
-    <div style="margin-bottom: 2rem; background: var(--bg-card-alt); padding: 1.25rem; border-radius: 12px; border: 1px solid rgba(153,198,62,0.3);">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-        <h3 style="margin: 0; color: var(--flipout-green); font-size: 1.1rem; font-family: 'Unbounded', sans-serif;">🏆 Staff Performance Metrics</h3>
-        <button onclick="loadStaffPerformance()" class="btn-secondary btn-small">🔄 Refresh Leaderboard</button>
-      </div>
-      <div id="staff-performance-container">
-        <p style="text-align: center; color: var(--text-muted);">Loading staff performance statistics...</p>
-      </div>
-    </div>
-
     <!-- EOD QUESTIONS MANAGER SECTION -->
     <div style="margin-bottom: 2rem; background: var(--bg-card-alt); padding: 1.25rem; border-radius: 12px; border: 1px solid rgba(255,80,159,0.3);">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
@@ -2256,7 +2245,7 @@
             </label>
           </div>
           <div class="task-meta">
-            ${task.requires_initials ? `<input type="text" class="initials-input" id="initials-${task.id}" value="${savedInitials || ''}" placeholder="Name (e.g. Josh T)" maxlength="25" ${isDone ? 'disabled' : ''}>` : ''}
+            ${task.requires_initials ? `<input type="text" class="initials-input" id="initials-${task.id}" value="${savedInitials || ''}" placeholder="Name + Initial" maxlength="25" ${isDone ? 'disabled' : ''}>` : ''}
             ${task.requires_photo ? `
               <label class="photo-upload-btn" ${isDone ? 'style="display:none;"' : ''}>
                 📷 ${photoUrls.length > 0 ? 'Upload More Photos' : `Upload Photos (Max ${maxPhotos})`}

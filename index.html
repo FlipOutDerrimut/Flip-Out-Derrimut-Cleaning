@@ -79,6 +79,7 @@
       overflow: hidden;
     }
 
+    /* Top Left Navigation Actions */
     .top-left-actions {
       position: absolute;
       top: 15px;
@@ -89,6 +90,7 @@
       z-index: 20;
     }
 
+    /* Top Right Navigation Actions */
     .top-right-actions {
       position: absolute;
       top: 15px;
@@ -371,6 +373,18 @@
       color: var(--flipout-velvet);
     }
 
+    .badge-temp {
+      background: var(--flipout-pink);
+      color: #fff;
+      font-size: 0.7rem;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* EOD REPORT FORM STYLING MATCHING PDF */
     .eod-card {
       background: var(--bg-card-alt);
       border-radius: 14px;
@@ -434,6 +448,7 @@
       text-align: right;
     }
 
+    /* CASH CALCULATOR TABLE STYLING */
     .cash-calc-table-container {
       width: 100%;
       overflow-x: auto;
@@ -485,6 +500,28 @@
       background: #FFFFFF;
       color: #000000;
       border-radius: 4px;
+    }
+
+    .cash-calc-table input.calc-qty:focus {
+      outline: 2px solid var(--flipout-pink);
+      border-color: var(--flipout-pink);
+    }
+
+    .cash-calc-table .highlight-label {
+      background-color: var(--flipout-green);
+      color: #000000;
+      font-weight: 800;
+      font-family: 'Unbounded', sans-serif;
+      text-align: center;
+      font-size: 1rem;
+    }
+
+    .cash-calc-table .highlight-val {
+      font-weight: 900;
+      font-size: 1.15rem;
+      background-color: #FFFFFF;
+      color: #000000;
+      text-align: center;
     }
 
     .reward-modal-overlay {
@@ -757,7 +794,7 @@
     }
   </style>
 </head>
-<body onload="initialiseApp()">
+<body>
 
   <!-- 1. STAFF CHECKLIST VIEW -->
   <div id="main-app" class="container">
@@ -845,7 +882,7 @@
         </div>
         <div class="form-group" style="margin-bottom: 0;">
           <label for="eod-staff">Staff Member/s:</label>
-          <input type="text" id="eod-staff" placeholder="e.g. Joshua, Stephanie, Calvin" required />
+          <input type="text" id="eod-staff" placeholder="e.g. Joshua, Stephanie, Maryann" required />
         </div>
       </div>
 
@@ -918,15 +955,7 @@
         </div>
       </div>
 
-      <!-- MOVED ENQUIRIES COUNTER & STAFF PERFORMANCE SECTION -->
-      <div class="eod-card" style="border: 1px solid rgba(153,198,62,0.4);">
-        <div class="eod-section-title">🏆 Daily Enquiries & Staff Performance</div>
-        <div id="staff-performance-container">
-          <p style="text-align: center; color: var(--text-muted);">Loading staff performance & enquiry statistics...</p>
-        </div>
-      </div>
-
-      <!-- DYNAMIC EOD OPERATIONS QUESTIONS SECTION (LINKED TO SUPABASE TABLE) -->
+      <!-- DYNAMIC EOD QUESTIONS SECTION -->
       <div class="eod-card" id="eod-questions-card">
         <div class="eod-section-title">❓ End of Day Operational Questions</div>
         <div id="eod-questions-container">
@@ -1097,6 +1126,57 @@
             📥 Export CSV
           </button>
         </div>
+      </div>
+    </div>
+
+    <!-- STAFF PERFORMANCE METRICS & LEADERBOARD SECTION -->
+    <div style="margin-bottom: 2rem; background: var(--bg-card-alt); padding: 1.25rem; border-radius: 12px; border: 1px solid rgba(153,198,62,0.3);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h3 style="margin: 0; color: var(--flipout-green); font-size: 1.1rem; font-family: 'Unbounded', sans-serif;">🏆 Staff Performance Metrics</h3>
+        <button onclick="loadStaffPerformance()" class="btn-secondary btn-small">🔄 Refresh Leaderboard</button>
+      </div>
+      <div id="staff-performance-container">
+        <p style="text-align: center; color: var(--text-muted);">Loading staff performance statistics...</p>
+      </div>
+    </div>
+
+    <!-- EOD QUESTIONS MANAGER SECTION -->
+    <div style="margin-bottom: 2rem; background: var(--bg-card-alt); padding: 1.25rem; border-radius: 12px; border: 1px solid rgba(255,80,159,0.3);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h3 style="margin: 0; color: var(--flipout-pink); font-size: 1.1rem; font-family: 'Unbounded', sans-serif;">❓ Manage EOD Report Questions</h3>
+        <button onclick="loadBackOfficeQuestions()" class="btn-secondary btn-small">🔄 Refresh Questions</button>
+      </div>
+
+      <form id="eod-question-form" style="margin-bottom: 1.25rem; background: var(--bg-input); padding: 1rem; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);">
+        <input type="hidden" id="editing-question-id" value="" />
+        <div class="form-group">
+          <label for="new-question-text">Question Text</label>
+          <input type="text" id="new-question-text" placeholder="e.g. Were all party rooms cleaned & re-stocked?" required />
+        </div>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <div class="form-group" style="flex: 1; min-width: 160px;">
+            <label for="new-question-type">Input Type</label>
+            <select id="new-question-type">
+              <option value="text">Short Text</option>
+              <option value="textarea">Detailed Response</option>
+              <option value="boolean">Yes / No</option>
+            </select>
+          </div>
+          <div class="form-group" style="flex: 1; min-width: 140px; display: flex; align-items: flex-end;">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 0.75rem;">
+              <input type="checkbox" id="new-question-active" checked style="width: auto;"> Active Question
+            </label>
+          </div>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <button type="submit" id="save-question-btn" class="btn-primary" style="flex: 1;">+ Add Question</button>
+          <button type="button" id="cancel-question-edit-btn" onclick="cancelEditQuestion()" class="btn-danger hidden">Cancel Edit</button>
+        </div>
+        <div id="question-form-msg"></div>
+      </form>
+
+      <div id="backoffice-questions-list">
+        <p style="text-align: center; color: var(--text-muted);">Loading questions...</p>
       </div>
     </div>
 
@@ -1367,6 +1447,8 @@
     const adminTaskList = document.getElementById('admin-task-list');
     const approvalTaskList = document.getElementById('approval-task-list');
     const approvalQueueSection = document.getElementById('approval-queue-section');
+    const mainDayTabs = document.querySelectorAll('.main-day-tab');
+    const adminFilterTabs = document.querySelectorAll('.admin-filter-tab');
 
     // Navigation View Switchers
     window.showMainApp = function() {
@@ -1417,6 +1499,8 @@
       backOfficeScreen.classList.remove('hidden');
       resetInactivityTimer();
       loadAdminTasks();
+      loadStaffPerformance();
+      loadBackOfficeQuestions();
     };
 
     window.togglePasswordVisibility = function(inputId, btnEl) {
@@ -1565,6 +1649,11 @@
       setupEODCalculations();
       setupAuthListeners();
 
+      const qForm = document.getElementById('eod-question-form');
+      if (qForm) {
+        qForm.addEventListener('submit', handleQuestionFormSubmit);
+      }
+
       setInterval(() => {
         const melbToday = getMelbourneTodayISO();
         if (currentSelectedDay === getMelbourneDayName() && currentSelectedDateISO !== melbToday) {
@@ -1575,6 +1664,8 @@
           selectDay(currentSelectedDay, true);
         } else if (!backOfficeScreen.classList.contains('hidden')) {
           loadAdminTasks(true);
+          loadStaffPerformance(true);
+          loadBackOfficeQuestions(true);
         }
       }, 15000);
     }
@@ -1653,219 +1744,6 @@
       await supabaseClient.auth.signOut();
       currentUserRole = 'supervisor';
       showMainApp();
-    };
-
-    // =========================================================================
-    // ENQUIRIES COUNTER & STAFF PERFORMANCE MANAGEMENT (IN EOD REPORT)
-    // =========================================================================
-    let perfAutoSaveTimer = null;
-
-    function getPerfData() {
-      const defaultData = {
-        lastSavedDate: getMelbourneTodayISO(),
-        lastSavedDay: getMelbourneDayName(),
-        enquiries: { count: 0 },
-        workers: [
-          { id: 'w1', name: 'Joshua', bookings: 0 },
-          { id: 'w2', name: 'Calvin', bookings: 0 }
-        ],
-        weeklyHistory: {}
-      };
-
-      try {
-        const raw = localStorage.getItem('flipout_staff_perf_v3');
-        if (!raw) return defaultData;
-        const parsed = JSON.parse(raw);
-        return { ...defaultData, ...parsed };
-      } catch (e) {
-        return defaultData;
-      }
-    }
-
-    function savePerfData(data) {
-      localStorage.setItem('flipout_staff_perf_v3', JSON.stringify(data));
-      const statusEl = document.getElementById('autosave-status');
-      if (statusEl) {
-        statusEl.textContent = '✓ All changes saved';
-        statusEl.style.color = 'var(--flipout-green)';
-      }
-    }
-
-    function handlePerfAutoSave() {
-      const statusEl = document.getElementById('autosave-status');
-      if (statusEl) {
-        statusEl.textContent = '⏳ Saving changes...';
-        statusEl.style.color = 'var(--warning)';
-      }
-
-      if (perfAutoSaveTimer) clearTimeout(perfAutoSaveTimer);
-      perfAutoSaveTimer = setTimeout(() => {
-        commitPerfFromUI();
-      }, 500);
-    }
-
-    function commitPerfFromUI() {
-      const data = getPerfData();
-      const melbToday = getMelbourneTodayISO();
-
-      if (data.lastSavedDate !== melbToday) {
-        checkAndPerformDailyReset(data);
-        return;
-      }
-
-      const enquiryInput = document.getElementById('enquiry-count-input');
-      if (enquiryInput) {
-        data.enquiries = { count: Math.max(0, parseInt(enquiryInput.value) || 0) };
-      }
-
-      data.weeklyHistory[melbToday] = {
-        date: melbToday,
-        dayName: getMelbourneDayName(),
-        enquiries: { ...data.enquiries },
-        workers: JSON.parse(JSON.stringify(data.workers))
-      };
-
-      savePerfData(data);
-    }
-
-    function checkAndPerformDailyReset(data) {
-      const melbToday = getMelbourneTodayISO();
-      if (data.lastSavedDate !== melbToday) {
-        if (data.lastSavedDate) {
-          data.weeklyHistory[data.lastSavedDate] = {
-            date: data.lastSavedDate,
-            dayName: data.lastSavedDay || 'day',
-            enquiries: { ...data.enquiries },
-            workers: JSON.parse(JSON.stringify(data.workers))
-          };
-        }
-
-        data.enquiries = { count: 0 };
-        data.workers.forEach(w => w.bookings = 0);
-
-        data.lastSavedDate = melbToday;
-        data.lastSavedDay = getMelbourneDayName();
-        savePerfData(data);
-      }
-    }
-
-    window.loadStaffPerformance = function() {
-      const container = document.getElementById('staff-performance-container');
-      if (!container) return;
-
-      const data = getPerfData();
-      checkAndPerformDailyReset(data);
-      renderStaffPerfUI(data);
-    };
-
-    function renderStaffPerfUI(data) {
-      const container = document.getElementById('staff-performance-container');
-      if (!container) return;
-
-      const enquiryCount = data.enquiries?.count || 0;
-
-      const html = `
-        <div class="staff-perf-wrapper" style="display: flex; flex-direction: column; gap: 1rem;">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span id="autosave-status" style="font-size: 0.8rem; color: var(--flipout-green); font-weight: 600;">✓ All changes saved</span>
-            <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">${getMelbourneDayName().toUpperCase()} (${getMelbourneTodayISO()})</span>
-          </div>
-
-          <!-- Daily Enquiries Counter -->
-          <div style="background: var(--bg-input); padding: 1rem; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);">
-            <h4 style="margin: 0 0 0.75rem 0; color: var(--flipout-pink); font-size: 0.95rem; font-family: 'Unbounded', sans-serif;">📋 Daily Enquiries Counter</h4>
-            <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.04); padding: 10px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
-              <span style="font-weight: 600; font-size: 0.95rem; color: var(--text-light);">Total Daily Enquiries Received:</span>
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <button type="button" onclick="adjustEnquiryCount(-1)" class="top-nav-btn" style="padding: 6px 14px; font-size: 1.2rem; font-weight: bold; background: rgba(255,77,77,0.2); border-color: var(--danger); color: #fff;">-</button>
-                <input type="number" min="0" id="enquiry-count-input" value="${enquiryCount}" oninput="updateEnquiryCountDirect(this.value)" style="width: 75px; text-align: center; padding: 0.5rem; font-weight: 800; font-size: 1.1rem; color: var(--flipout-pink); border-color: var(--flipout-pink);" />
-                <button type="button" onclick="adjustEnquiryCount(1)" class="top-nav-btn" style="padding: 6px 14px; font-size: 1.2rem; font-weight: bold; background: rgba(153,198,62,0.2); border-color: var(--flipout-green); color: #fff;">+</button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Staff Performance & Worker Roster Table -->
-          <div style="background: var(--bg-input); padding: 1rem; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-              <h4 style="margin: 0; color: var(--flipout-green); font-size: 0.95rem; font-family: 'Unbounded', sans-serif;">👥 Staff Bookings & Performance</h4>
-              <button type="button" onclick="addWorker()" class="btn-secondary btn-small">+ Add Worker</button>
-            </div>
-            <div id="worker-list-rows" style="display: flex; flex-direction: column; gap: 8px;">
-              ${data.workers.length > 0 ? data.workers.map(w => `
-                <div class="worker-row" style="display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.04); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
-                  <input type="text" value="${w.name || ''}" placeholder="Worker Name" oninput="updateWorkerName('${w.id}', this.value)" style="flex: 1; padding: 0.5rem; font-size: 0.9rem;" />
-                  <div style="display: flex; align-items: center; gap: 6px;">
-                    <button type="button" onclick="adjustBookingCount('${w.id}', -1)" class="top-nav-btn" style="padding: 4px 10px; font-size: 1.1rem; font-weight: bold; background: rgba(255,77,77,0.2); border-color: var(--danger); color: #fff;">-</button>
-                    <input type="number" min="0" value="${w.bookings || 0}" oninput="updateWorkerBookingsDirect('${w.id}', this.value)" style="width: 55px; text-align: center; padding: 0.4rem; font-weight: bold; color: var(--flipout-green);" />
-                    <button type="button" onclick="adjustBookingCount('${w.id}', 1)" class="top-nav-btn" style="padding: 4px 10px; font-size: 1.1rem; font-weight: bold; background: rgba(153,198,62,0.2); border-color: var(--flipout-green); color: #fff;">+</button>
-                  </div>
-                  <button type="button" onclick="removeWorker('${w.id}')" class="btn-danger btn-small" title="Remove Worker" style="padding: 6px 8px; border-radius: 6px;">🗑️</button>
-                </div>
-              `).join('') : '<p style="text-align: center; color: var(--text-muted); font-size: 0.85rem;">No staff members added yet. Click "+ Add Worker" above.</p>'}
-            </div>
-          </div>
-        </div>
-      `;
-
-      container.innerHTML = html;
-    }
-
-    window.adjustEnquiryCount = function(delta) {
-      const data = getPerfData();
-      if (!data.enquiries) data.enquiries = { count: 0 };
-      data.enquiries.count = Math.max(0, (parseInt(data.enquiries.count) || 0) + delta);
-      savePerfData(data);
-      renderStaffPerfUI(data);
-    };
-
-    window.updateEnquiryCountDirect = function(val) {
-      const data = getPerfData();
-      if (!data.enquiries) data.enquiries = { count: 0 };
-      data.enquiries.count = Math.max(0, parseInt(val) || 0);
-      handlePerfAutoSave();
-    };
-
-    window.addWorker = function() {
-      const data = getPerfData();
-      const newId = 'w_' + Date.now();
-      data.workers.push({ id: newId, name: '', bookings: 0 });
-      savePerfData(data);
-      renderStaffPerfUI(data);
-    };
-
-    window.removeWorker = function(workerId) {
-      const data = getPerfData();
-      data.workers = data.workers.filter(w => w.id !== workerId);
-      savePerfData(data);
-      renderStaffPerfUI(data);
-    };
-
-    window.adjustBookingCount = function(workerId, delta) {
-      const data = getPerfData();
-      const worker = data.workers.find(w => w.id === workerId);
-      if (worker) {
-        worker.bookings = Math.max(0, (parseInt(worker.bookings) || 0) + delta);
-        savePerfData(data);
-        renderStaffPerfUI(data);
-      }
-    };
-
-    window.updateWorkerName = function(workerId, newName) {
-      const data = getPerfData();
-      const worker = data.workers.find(w => w.id === workerId);
-      if (worker) {
-        worker.name = newName;
-        handlePerfAutoSave();
-      }
-    };
-
-    window.updateWorkerBookingsDirect = function(workerId, val) {
-      const data = getPerfData();
-      const worker = data.workers.find(w => w.id === workerId);
-      if (worker) {
-        worker.bookings = Math.max(0, parseInt(val) || 0);
-        handlePerfAutoSave();
-      }
     };
 
     // CASH CALCULATOR LOGIC
@@ -1961,55 +1839,52 @@
       document.getElementById('eod-grand-total-input').value = `$${grandTotal.toFixed(2)}`;
     }
 
-    // LOAD DYNAMIC OPERATIONAL QUESTIONS DIRECTLY FROM PRE-FILLED SUPABASE TABLE
     async function loadEODQuestionsForForm() {
       const container = document.getElementById('eod-questions-container');
       if (!container) return;
 
-      container.innerHTML = `<p style="text-align: center; color: var(--text-muted);">Loading operational questions...</p>`;
+      container.innerHTML = `<p style="text-align: center; color: var(--text-muted);">Loading questions...</p>`;
 
-      try {
-        const { data: questions, error } = await supabaseClient
-          .from('eod_questions')
-          .select('*')
-          .eq('is_active', true)
-          .order('id', { ascending: true });
+      const { data: questions, error } = await supabaseClient
+        .from('eod_questions')
+        .select('*')
+        .eq('is_active', true)
+        .order('id', { ascending: true });
 
-        if (error) throw error;
+      if (error) {
+        container.innerHTML = `<p style="color: var(--text-muted); font-size: 0.85rem;">No questions configured or failed to load questions.</p>`;
+        return;
+      }
 
-        if (!questions || questions.length === 0) {
-          container.innerHTML = `<p style="color: var(--text-muted); font-size: 0.85rem;">No active operational questions configured in database.</p>`;
-          return;
+      if (!questions || questions.length === 0) {
+        container.innerHTML = `<p style="color: var(--text-muted); font-size: 0.85rem;">No active operational questions configured for EOD reports.</p>`;
+        return;
+      }
+
+      const formFields = questions.map((q, idx) => {
+        let fieldHtml = '';
+        if (q.question_type === 'textarea') {
+          fieldHtml = `<textarea id="eod-q-${q.id}" data-question-text="${q.question_text.replace(/"/g, '&quot;')}" rows="2" placeholder="Enter details..." required></textarea>`;
+        } else if (q.question_type === 'boolean') {
+          fieldHtml = `
+            <select id="eod-q-${q.id}" data-question-text="${q.question_text.replace(/"/g, '&quot;')}" required>
+              <option value="Yes">Yes</option>
+              <option value="No">No</option>
+              <option value="N/A">N/A</option>
+            </select>`;
+        } else {
+          fieldHtml = `<input type="text" id="eod-q-${q.id}" data-question-text="${q.question_text.replace(/"/g, '&quot;')}" placeholder="Your answer..." required />`;
         }
 
-        const formFields = questions.map((q, idx) => {
-          let fieldHtml = '';
-          if (q.question_type === 'textarea') {
-            fieldHtml = `<textarea id="eod-q-${q.id}" data-question-text="${q.question_text.replace(/"/g, '&quot;')}" rows="2" placeholder="Enter details..." required></textarea>`;
-          } else if (q.question_type === 'boolean') {
-            fieldHtml = `
-              <select id="eod-q-${q.id}" data-question-text="${q.question_text.replace(/"/g, '&quot;')}" required>
-                <option value="Yes">Yes</option>
-                <option value="No">No</option>
-                <option value="N/A">N/A</option>
-              </select>`;
-          } else {
-            fieldHtml = `<input type="text" id="eod-q-${q.id}" data-question-text="${q.question_text.replace(/"/g, '&quot;')}" placeholder="Your answer..." required />`;
-          }
+        return `
+          <div class="form-group" style="margin-bottom: 0.85rem;">
+            <label for="eod-q-${q.id}">${idx + 1}. ${q.question_text}</label>
+            ${fieldHtml}
+          </div>
+        `;
+      });
 
-          return `
-            <div class="form-group" style="margin-bottom: 0.85rem;">
-              <label for="eod-q-${q.id}">${idx + 1}. ${q.question_text}</label>
-              ${fieldHtml}
-            </div>
-          `;
-        });
-
-        container.innerHTML = formFields.join('');
-      } catch (err) {
-        console.error('Error fetching EOD questions:', err);
-        container.innerHTML = `<p style="color: var(--text-muted); font-size: 0.85rem;">Failed to load questions from database.</p>`;
-      }
+      container.innerHTML = formFields.join('');
     }
 
     function populateEODReportFields() {
@@ -2022,7 +1897,6 @@
       document.getElementById('eod-date').value = formattedDate;
       document.getElementById('eod-day').value = capitalizedDay;
       calculateEODTotals();
-      loadStaffPerformance();
       loadEODQuestionsForForm();
     }
 
@@ -2045,10 +1919,6 @@
         ? questionAnswers.map(qa => `• ${qa.question}: ${qa.answer}`).join('\n')
         : 'No specific questions answered.';
 
-      const perfData = getPerfData();
-      const enquiryCount = perfData.enquiries?.count || 0;
-      const workerSummary = perfData.workers.map(w => `${w.name}: ${w.bookings} bookings`).join(', ');
-
       const reportData = {
         date: document.getElementById('eod-date').value,
         day: document.getElementById('eod-day').value,
@@ -2063,342 +1933,619 @@
         online_booking: parseFloat(document.getElementById('eod-online-booking').value) || 0,
         bank_transfer: parseFloat(document.getElementById('eod-bank-transfer').value) || 0,
         grand_total: document.getElementById('eod-grand-total-input').value,
-        question_responses: JSON.stringify(questionAnswers),
-        enquiry_count: enquiryCount,
-        staff_performance: JSON.stringify(perfData.workers)
+        question_responses: JSON.stringify(questionAnswers)
       };
 
       try {
-        const { error: dbErr } = await supabaseClient
+        const { error } = await supabaseClient
           .from('eod_reports')
           .insert([reportData]);
 
-        if (dbErr) console.warn('Supabase DB Insert Note:', dbErr.message);
-
-        // Fetch task completion statistics for today
-        const { data: completions } = await supabaseClient
-          .from('completions')
-          .select('*')
-          .eq('completion_date', currentSelectedDateISO);
-
-        const totalTasksForDay = allLoadedTasks.filter(t => t.days && t.days.includes(currentSelectedDay)).length;
-        const completedCount = completions ? completions.length : 0;
-        const completionRate = totalTasksForDay > 0 ? Math.round((completedCount / totalTasksForDay) * 100) : 100;
-
-        const emailParams = {
-          report_date: reportData.date,
-          report_day: reportData.day,
-          staff_names: reportData.staff,
-          takings: `$${reportData.takings.toFixed(2)}`,
-          eod_takings: `$${reportData.eod_takings.toFixed(2)}`,
-          total_cash: reportData.total_cash,
-          eftpos_1: `$${reportData.eftpos_1.toFixed(2)}`,
-          eftpos_2: `$${reportData.eftpos_2.toFixed(2)}`,
-          total_eftpos: reportData.total_eftpos,
-          online_booking: `$${reportData.online_booking.toFixed(2)}`,
-          bank_transfer: `$${reportData.bank_transfer.toFixed(2)}`,
-          grand_total: reportData.grand_total,
-          enquiry_count: enquiryCount,
-          staff_performance_text: workerSummary || 'None recorded',
-          operational_questions_text: formattedAnswersText,
-          checklist_completion_rate: `${completionRate}% (${completedCount}/${totalTasksForDay} tasks)`
-        };
-
-        if (typeof emailjs !== 'undefined' && EMAILJS_SERVICE_ID && EMAILJS_EOD_TEMPLATE_ID) {
-          await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_EOD_TEMPLATE_ID, emailParams);
+        if (error) {
+          console.warn('Supabase DB Insert Note:', error.message);
         }
 
-        msgDiv.className = 'success-message';
-        msgDiv.textContent = '✓ End of Day Report submitted successfully!';
-        setTimeout(() => showMainApp(), 2000);
-      } catch (err) {
-        console.error('Submission error:', err);
-        msgDiv.className = 'error-message';
-        msgDiv.textContent = 'Report recorded locally, but email failed: ' + err.message;
-      }
-    }
+        const { data: completions } = await supabaseClient
+          .from('task_completions')
+          .select('task_id, initials, photo_url')
+          .eq('completed_date', currentSelectedDateISO);
 
-    // =========================================================================
-    // TASK CHECKLIST & MAIN APP LOGIC (SAFE LOAD TO PREVENT SUPABASE CRASHES)
-    // =========================================================================
-    async function selectDay(dayName, isSilent = false) {
-      currentSelectedDay = dayName.toLowerCase();
-      currentSelectedDateISO = getDateForDayOfWeek(currentSelectedDay);
-
-      document.querySelectorAll('.main-day-tab').forEach(tab => {
-        tab.classList.toggle('active', tab.dataset.day === currentSelectedDay);
-      });
-
-      const activeDayTitle = document.getElementById('active-day-title');
-      if (activeDayTitle) {
-        const dayFormatted = currentSelectedDay.charAt(0).toUpperCase() + currentSelectedDay.slice(1);
-        const [y, m, d] = currentSelectedDateISO.split('-');
-        activeDayTitle.textContent = `${dayFormatted}'s Tasks (${d}/${m}/${y})`;
-      }
-
-      if (!isSilent) {
-        pendingTasksContainer.innerHTML = '<p style="text-align: center; color: var(--text-muted);">Loading tasks from database...</p>';
-      }
-
-      try {
-        const { data: tasks, error: taskErr } = await supabaseClient
+        const { data: tasks } = await supabaseClient
           .from('tasks')
           .select('*')
           .eq('is_approved', true)
-          .order('id', { ascending: true });
+          .or(`days.cs.{${currentSelectedDay}},and(is_temporary.eq.true,created_for_date.eq.${currentSelectedDateISO})`)
+          .order('sort_order', { ascending: true });
 
-        if (taskErr) throw taskErr;
+        const validTasks = (tasks || []).filter(t => !t.is_temporary || t.created_for_date === currentSelectedDateISO);
+        const completionMap = new Map();
+        (completions || []).forEach(c => completionMap.set(c.task_id, c));
 
-        const { data: completions, error: compErr } = await supabaseClient
-          .from('completions')
-          .select('*')
-          .eq('completion_date', currentSelectedDateISO);
+        let completedCount = 0;
+        const completedDetailsText = [];
+        const photoElements = [];
 
-        if (compErr) throw compErr;
+        validTasks.forEach(t => {
+          if (completionMap.has(t.id)) {
+            completedCount++;
+            const comp = completionMap.get(t.id);
+            const initialsText = comp.initials ? comp.initials : 'N/A';
+            const urls = parsePhotoUrls(comp.photo_url);
 
-        allLoadedTasks = tasks || [];
-        renderTaskList(allLoadedTasks, completions || []);
-      } catch (err) {
-        console.error('Task loading error:', err);
-        if (!isSilent) {
-          pendingTasksContainer.innerHTML = `<p style="color: var(--danger); text-align: center;">Error loading tasks: ${err.message}</p>`;
+            let textLine = `• ${t.title} [Initials: ${initialsText}]`;
+            if (urls.length > 0) {
+              urls.forEach((u, i) => {
+                textLine += `\n   📸 Photo ${urls.length > 1 ? i + 1 : ''}: ${u}`;
+              });
+            }
+            completedDetailsText.push(textLine);
+
+            if (urls.length > 0) {
+              const photoLinks = urls.map((u, i) => `
+                <div style="margin-top: 6px; margin-bottom: 10px;">
+                  <a href="${u}" target="_blank" style="color: #FF509F; font-weight: bold; text-decoration: underline;">
+                    🖼️ View High Res Photo ${urls.length > 1 ? i + 1 : ''}
+                  </a><br>
+                  <img src="${u}" alt="Task Photo" style="max-width: 100%; max-height: 250px; border-radius: 8px; margin-top: 4px; border: 2px solid #FF509F; display: block;" />
+                </div>
+              `).join('');
+
+              photoElements.push(`
+                <div style="margin-bottom: 14px; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; border-left: 4px solid #99C63E;">
+                  <strong style="color: #99C63E; font-size: 1.05em;">• ${t.title} (Initials: ${initialsText}):</strong>
+                  ${photoLinks}
+                </div>
+              `);
+            }
+          }
+        });
+
+        const totalCount = validTasks.length;
+        const ratePercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+        const summaryDetailsText = completedDetailsText.length > 0 ? completedDetailsText.join('\n\n') : 'No completed tasks recorded today.';
+        const photoGalleryHtml = photoElements.length > 0 ? photoElements.join('') : '<span style="color: #A0A0A0;">No photos uploaded today.</span>';
+
+        if (typeof emailjs !== 'undefined' && EMAILJS_PUBLIC_KEY !== 'YOUR_EMAILJS_PUBLIC_KEY') {
+          const templateParams = {
+            day: reportData.day,
+            report_date: reportData.date,
+            staff_members: reportData.staff,
+            rec1_float: reportData.float,
+            rec1_takings: `$${reportData.takings.toFixed(2)}`,
+            rec1_eod_takings: `$${reportData.eod_takings.toFixed(2)}`,
+            rec1_total_cash: reportData.total_cash,
+            rec1_eftpos: `$${reportData.eftpos_1.toFixed(2)}`,
+            rec2_eftpos: `$${reportData.eftpos_2.toFixed(2)}`,
+            total_eftpos: reportData.total_eftpos,
+            total_cash: reportData.total_cash,
+            online_booking: `$${reportData.online_booking.toFixed(2)}`,
+            bank_transfer: `$${reportData.bank_transfer.toFixed(2)}`,
+            grand_total: reportData.grand_total,
+            completion_rate: `${ratePercent}%`,
+            completed_count: completedCount,
+            total_count: totalCount,
+            summary_details: summaryDetailsText,
+            question_responses: formattedAnswersText,
+            photo_gallery: photoGalleryHtml
+          };
+
+          await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_EOD_TEMPLATE_ID, templateParams);
         }
+
+        msgDiv.className = 'success-message';
+        msgDiv.textContent = '✓ End of Day Report submitted & email dispatched successfully!';
+        alert(`✓ EOD Report Submitted & Email Sent!\n\nDate: ${reportData.date}\nStaff: ${reportData.staff}\nTotal: ${reportData.grand_total}`);
+        
+        setTimeout(() => {
+          showMainApp();
+        }, 1200);
+
+      } catch (err) {
+        msgDiv.className = 'error-message';
+        msgDiv.textContent = 'Submission error: ' + (err.text || err.message || err);
       }
     }
 
-    function renderTaskList(tasks, completions) {
-      const completedMap = new Map();
-      completions.forEach(c => completedMap.set(c.task_id, c));
-
-      const dayTasks = tasks.filter(t => {
-        if (!t.days) return false;
-        if (Array.isArray(t.days)) return t.days.includes(currentSelectedDay);
-        return t.days.toLowerCase().includes(currentSelectedDay);
+    async function selectDay(dayName, isSilentRefresh = false) {
+      dismissKeyboard();
+      currentSelectedDay = dayName;
+      currentSelectedDateISO = getDateForDayOfWeek(dayName);
+      
+      mainDayTabs.forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.day === dayName);
       });
 
-      let pendingHtml = '';
-      let completedHtml = '';
-      let completedCount = 0;
+      const isToday = getMelbourneDayName() === dayName;
+      document.getElementById('active-day-title').textContent = `${dayName.toUpperCase()} ${isToday ? '(Today)' : ''}`;
 
-      dayTasks.forEach(t => {
-        const comp = completedMap.get(t.id);
-        const isDone = !!comp;
-        if (isDone) completedCount++;
+      if (!isSilentRefresh) {
+        pendingTasksContainer.innerHTML = `<p style="text-align: center; color: var(--text-muted);">Loading tasks...</p>`;
+      }
 
-        const photos = parsePhotoUrls(comp?.photo_urls);
+      const { data: completions } = await supabaseClient
+        .from('task_completions')
+        .select('task_id, initials, photo_url')
+        .eq('completed_date', currentSelectedDateISO);
 
-        const cardHtml = `
-          <div class="task-card ${isDone ? 'completed' : ''}" id="task-card-${t.id}">
-            <div class="task-main">
-              <input type="checkbox" class="task-checkbox" ${isDone ? 'checked' : ''} onchange="toggleTaskCompletion(${t.id}, this.checked, '${comp?.completed_by || ''}')">
-              <span class="task-label">[${t.category}] ${t.title}</span>
-            </div>
-            <div class="task-meta">
-              ${t.requires_initials ? `
-                <input type="text" class="initials-input" id="initials-${t.id}" placeholder="Initials" value="${comp?.completed_by || ''}" ${isDone ? 'readonly' : ''} />
-              ` : ''}
-              
-              ${t.requires_photo ? `
-                <label class="photo-upload-btn">
-                  📷 Upload Photo
-                  <input type="file" accept="image/*" capture="environment" style="display:none;" onchange="handlePhotoUpload(${t.id}, this)">
-                </label>
-              ` : ''}
+      const completionMap = new Map();
+      if (completions) {
+        completions.forEach(c => completionMap.set(c.task_id, c));
+      }
 
-              ${photos.length > 0 ? photos.map((url, i) => `
-                <a href="${url}" target="_blank" class="view-photo-btn">🖼️ Photo ${i + 1}</a>
-              `).join('') : ''}
-            </div>
-          </div>
-        `;
+      const { data: tasks, error } = await supabaseClient
+        .from('tasks')
+        .select('*')
+        .eq('is_approved', true)
+        .or(`days.cs.{${dayName}},and(is_temporary.eq.true,created_for_date.eq.${currentSelectedDateISO})`)
+        .order('sort_order', { ascending: true });
 
+      if (error) {
+        if (!isSilentRefresh) pendingTasksContainer.innerHTML = `<p class="error-message">Error loading tasks: ${error.message}</p>`;
+        return;
+      }
+
+      const validTasks = (tasks || []).filter(task => {
+        if (task.is_temporary) {
+          return task.created_for_date === currentSelectedDateISO;
+        }
+        return true;
+      });
+
+      if (validTasks.length === 0) {
+        pendingTasksContainer.innerHTML = `<p style="text-align: center; color: var(--text-muted);">No tasks assigned for ${dayName}.</p>`;
+        updateProgressBar(0, 0);
+        completedSection.classList.add('hidden');
+        return;
+      }
+
+      const pendingList = [];
+      const completedList = [];
+
+      validTasks.forEach(task => {
+        const completionData = completionMap.get(task.id);
+        const isDone = !!completionData;
+        const photoUrl = completionData ? completionData.photo_url : null;
+        const initials = completionData ? completionData.initials : '';
+
+        const cardHtml = renderTaskCard(task, isDone, photoUrl, initials);
         if (isDone) {
-          completedHtml += cardHtml;
+          completedList.push(cardHtml);
         } else {
-          pendingHtml += cardHtml;
+          pendingList.push(cardHtml);
         }
       });
 
-      pendingTasksContainer.innerHTML = pendingHtml || '<p style="text-align: center; color: var(--flipout-green); padding: 1rem;">🎉 All tasks completed for today!</p>';
-      completedTasksContainer.innerHTML = completedHtml;
+      pendingTasksContainer.innerHTML = pendingList.length > 0 ? pendingList.join('') : `<p style="text-align: center; color: var(--flipout-green); padding: 1.5rem; font-weight: bold;">All tasks for this day are completed! 🎉</p>`;
+      completedTasksContainer.innerHTML = completedList.join('');
 
-      if (completedCount > 0) {
+      if (completedList.length > 0) {
         completedSection.classList.remove('hidden');
       } else {
         completedSection.classList.add('hidden');
       }
 
-      const totalCount = dayTasks.length;
-      const pct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
-      document.getElementById('progress-percent').textContent = `${pct}%`;
-      document.getElementById('progress-bar-fill').style.width = `${pct}%`;
+      updateProgressBar(completedList.length, validTasks.length);
     }
 
-    async function toggleTaskCompletion(taskId, isCompleted, existingInitials) {
-      const task = allLoadedTasks.find(t => t.id === taskId);
-      const initialsInput = document.getElementById(`initials-${taskId}`);
-      let initials = initialsInput ? initialsInput.value.trim().toUpperCase() : '';
+    function renderTaskCard(task, isDone, savedPhotoUrl = null, savedInitials = '') {
+      const maxPhotos = task.max_photos || 1;
+      const photoUrls = parsePhotoUrls(savedPhotoUrl);
 
-      if (isCompleted && task?.requires_initials && !initials) {
-        alert('Please enter your staff initials to complete this task.');
-        selectDay(currentSelectedDay, true);
+      return `
+        <div class="task-card ${isDone ? 'completed' : ''}" id="card-${task.id}">
+          <div class="task-main">
+            <input type="checkbox" class="task-checkbox" id="task-${task.id}" ${isDone ? 'checked' : ''} onchange="toggleTaskComplete('${task.id}', this.checked)">
+            <label class="task-label" for="task-${task.id}">
+              ${task.is_temporary ? '<span class="badge-temp">Today Only</span> ' : ''}
+              ${task.title}
+            </label>
+          </div>
+          <div class="task-meta">
+            ${task.requires_initials ? `<input type="text" class="initials-input" id="initials-${task.id}" value="${savedInitials || ''}" placeholder="Initials" maxlength="4" ${isDone ? 'disabled' : ''}>` : ''}
+            ${task.requires_photo ? `
+              <label class="photo-upload-btn" ${isDone ? 'style="display:none;"' : ''}>
+                📷 ${photoUrls.length > 0 ? 'Upload More Photos' : `Upload Photos (Max ${maxPhotos})`}
+                <input type="file" id="photos-${task.id}" accept="image/*" capture="camera" multiple ${isDone ? 'disabled' : ''} style="display:none;" onchange="handleTaskPhotoSelect(this, '${task.id}', ${maxPhotos})">
+              </label>
+              <div id="photo-links-${task.id}" style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;">
+                ${photoUrls.map((url, i) => `
+                  <a href="${url}" target="_blank" rel="noopener noreferrer" class="view-photo-btn">
+                    🖼️ Photo ${photoUrls.length > 1 ? i + 1 : ''}
+                  </a>
+                `).join('')}
+              </div>
+              <span id="photo-filename-${task.id}" style="font-size:0.75rem; color: var(--flipout-green); font-weight: 600;"></span>
+            ` : ''}
+          </div>
+        </div>
+      `;
+    }
+
+    function updateProgressBar(completedCount, totalCount) {
+      const percent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+      document.getElementById('progress-percent').textContent = `${percent}%`;
+      document.getElementById('progress-bar-fill').style.width = `${percent}%`;
+    }
+
+    window.handleTaskPhotoSelect = async function(fileInput, taskId, maxPhotos = 1) {
+      dismissKeyboard();
+      const files = Array.from(fileInput.files);
+      if (!files || files.length === 0) return;
+
+      if (files.length > maxPhotos) {
+        alert(`You can upload a maximum of ${maxPhotos} photo(s) for this task.`);
+        fileInput.value = '';
         return;
       }
 
-      try {
-        if (isCompleted) {
-          const { error } = await supabaseClient
-            .from('completions')
-            .insert([{
-              task_id: taskId,
-              completion_date: currentSelectedDateISO,
-              completed_by: initials || 'STAFF',
-              completed_at: new Date().toISOString()
-            }]);
+      const statusSpan = document.getElementById(`photo-filename-${taskId}`);
+      if (statusSpan) statusSpan.textContent = `Uploading ${files.length} photo(s)...`;
 
-          if (error) throw error;
+      const uploadedUrls = [];
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const filePath = `completions/${Date.now()}_${i}_${file.name}`;
+
+        const { data, error } = await supabaseClient
+          .storage
+          .from('task-photos')
+          .upload(filePath, file);
+
+        if (error) {
+          alert(`Photo ${i + 1} upload failed: ` + error.message);
+          if (statusSpan) statusSpan.textContent = 'Upload failed';
+          return null;
+        }
+
+        const { data: publicUrlData } = supabaseClient
+          .storage
+          .from('task-photos')
+          .getPublicUrl(filePath);
+
+        uploadedUrls.push(publicUrlData.publicUrl);
+      }
+
+      fileInput.dataset.uploadedUrls = JSON.stringify(uploadedUrls);
+
+      if (statusSpan) {
+        const linksHtml = uploadedUrls.map((url, i) => 
+          `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color: var(--flipout-pink); text-decoration: underline; margin-left: 4px;">[Photo ${uploadedUrls.length > 1 ? i + 1 : ''}]</a>`
+        ).join(' ');
+        statusSpan.innerHTML = `✓ ${uploadedUrls.length} Photo(s) Ready! ${linksHtml}`;
+      }
+      return uploadedUrls;
+    };
+
+    window.toggleTaskComplete = async function(taskId, isChecking) {
+      dismissKeyboard();
+      const checkbox = document.getElementById(`task-${taskId}`);
+
+      if (isChecking) {
+        const initialsInput = document.getElementById(`initials-${taskId}`);
+        const initials = initialsInput ? initialsInput.value.trim().toUpperCase() : '';
+        
+        if (initialsInput && !initials) {
+          alert('Please enter your initials before completing this task.');
+          if (checkbox) checkbox.checked = false;
+          return;
+        }
+
+        const photoInput = document.getElementById(`photos-${taskId}`);
+        let photoUrl = null;
+        if (photoInput && photoInput.dataset.uploadedUrls) {
+          photoUrl = photoInput.dataset.uploadedUrls;
+        }
+
+        const { error } = await supabaseClient.from('task_completions').insert([{
+          task_id: taskId,
+          completed_date: currentSelectedDateISO,
+          initials: initials || 'N/A',
+          photo_url: photoUrl
+        }]);
+
+        if (error) {
+          alert('Error saving completion: ' + error.message);
+          if (checkbox) checkbox.checked = false;
+          return;
+        } else {
           triggerRewardEffect();
-        } else {
-          const { error } = await supabaseClient
-            .from('completions')
-            .delete()
-            .eq('task_id', taskId)
-            .eq('completion_date', currentSelectedDateISO);
-
-          if (error) throw error;
         }
-        selectDay(currentSelectedDay, true);
-      } catch (err) {
-        alert('Error updating completion status: ' + err.message);
-        selectDay(currentSelectedDay, true);
-      }
-    }
-
-    async function handlePhotoUpload(taskId, fileInput) {
-      if (!fileInput.files || fileInput.files.length === 0) return;
-      const file = fileInput.files[0];
-      const fileName = `${currentSelectedDateISO}_task_${taskId}_${Date.now()}`;
-
-      try {
-        const { data, error } = await supabaseClient.storage
-          .from('task-photos')
-          .upload(fileName, file);
-
-        if (error) throw error;
-
-        const { data: { publicUrl } } = supabaseClient.storage
-          .from('task-photos')
-          .getPublicUrl(fileName);
-
-        // Update completion record with photo URL
-        const { data: existingComp } = await supabaseClient
-          .from('completions')
-          .select('*')
+      } else {
+        const { error } = await supabaseClient.from('task_completions')
+          .delete()
           .eq('task_id', taskId)
-          .eq('completion_date', currentSelectedDateISO)
-          .maybeSingle();
+          .eq('completed_date', currentSelectedDateISO);
 
-        const currentPhotos = parsePhotoUrls(existingComp?.photo_urls);
-        currentPhotos.push(publicUrl);
-
-        if (existingComp) {
-          await supabaseClient
-            .from('completions')
-            .update({ photo_urls: JSON.stringify(currentPhotos) })
-            .eq('id', existingComp.id);
-        } else {
-          const initialsInput = document.getElementById(`initials-${taskId}`);
-          const initials = initialsInput ? initialsInput.value.trim().toUpperCase() : 'STAFF';
-
-          await supabaseClient
-            .from('completions')
-            .insert([{
-              task_id: taskId,
-              completion_date: currentSelectedDateISO,
-              completed_by: initials,
-              photo_urls: JSON.stringify(currentPhotos),
-              completed_at: new Date().toISOString()
-            }]);
+        if (error) {
+          alert('Error unchecking task: ' + error.message);
+          return;
         }
-
-        alert('✓ Photo uploaded successfully!');
-        selectDay(currentSelectedDay, true);
-      } catch (err) {
-        alert('Photo upload failed: ' + err.message);
       }
-    }
 
-    // =========================================================================
-    // BACK OFFICE TASK & USER MANAGEMENT LOGIC
-    // =========================================================================
-    async function loadAdminTasks(isSilent = false) {
-      if (!isSilent) {
-        adminTaskList.innerHTML = '<p style="text-align: center; color: var(--text-muted);">Loading tasks...</p>';
-      }
+      await selectDay(currentSelectedDay);
+    };
+
+    window.sendEODSummaryEmail = async function(isAutomated = false) {
+      dismissKeyboard();
+      if (!isAutomated && !confirm(`Send EOD summary report for ${currentSelectedDay.toUpperCase()} (${currentSelectedDateISO})?`)) return;
 
       try {
+        const { data: completions } = await supabaseClient
+          .from('task_completions')
+          .select('task_id, initials, photo_url')
+          .eq('completed_date', currentSelectedDateISO);
+
         const { data: tasks, error } = await supabaseClient
           .from('tasks')
           .select('*')
-          .order('id', { ascending: true });
+          .eq('is_approved', true)
+          .or(`days.cs.{${currentSelectedDay}},and(is_temporary.eq.true,created_for_date.eq.${currentSelectedDateISO})`)
+          .order('sort_order', { ascending: true });
 
-        if (error) throw error;
+        if (error) return alert('Failed to fetch tasks: ' + error.message);
 
-        const approved = tasks.filter(t => t.is_approved);
-        const unapproved = tasks.filter(t => !t.is_approved);
+        const validTasks = (tasks || []).filter(t => !t.is_temporary || t.created_for_date === currentSelectedDateISO);
+        const completionMap = new Map();
+        (completions || []).forEach(c => completionMap.set(c.task_id, c));
 
-        if (unapproved.length > 0 && currentUserRole === 'admin') {
-          approvalQueueSection.classList.remove('hidden');
-          approvalTaskList.innerHTML = unapproved.map(t => `
-            <div class="admin-task-item">
-              <div>
-                <strong>[${t.category}] ${t.title}</strong>
-                <div style="font-size: 0.75rem; color: var(--text-muted);">Days: ${Array.isArray(t.days) ? t.days.join(', ') : t.days}</div>
-              </div>
-              <div class="admin-actions">
-                <button onclick="approveTask(${t.id})" class="btn-success btn-small">✓ Approve</button>
-                <button onclick="rejectTask(${t.id})" class="btn-danger btn-small">✗ Reject</button>
-              </div>
-            </div>
-          `).join('');
-        } else {
-          approvalQueueSection.classList.add('hidden');
-        }
+        const completedDetailsText = [];
 
-        const filtered = approved.filter(t => {
-          if (activeAdminFilter === 'all') return true;
-          return Array.isArray(t.days) ? t.days.includes(activeAdminFilter) : t.days.toLowerCase().includes(activeAdminFilter);
+        validTasks.forEach(t => {
+          if (completionMap.has(t.id)) {
+            const comp = completionMap.get(t.id);
+            const initialsText = comp.initials ? comp.initials : 'N/A';
+            const urls = parsePhotoUrls(comp.photo_url);
+
+            let textLine = `• ${t.title} [Initials: ${initialsText}]`;
+            if (urls.length > 0) {
+              urls.forEach((u, i) => {
+                textLine += `\n    📸 Photo ${urls.length > 1 ? i + 1 : ''}: ${u}`;
+              });
+            }
+            completedDetailsText.push(textLine);
+          }
         });
 
-        adminTaskList.innerHTML = filtered.map(t => `
-          <div class="admin-task-item">
-            <div>
-              <strong>[${t.category}] ${t.title}</strong>
-              <div style="font-size: 0.75rem; color: var(--text-muted);">
-                Days: ${Array.isArray(t.days) ? t.days.join(', ') : t.days} | 
-                ${t.requires_photo ? '📷 Photo Required' : 'No Photo'} | 
-                ${t.requires_initials ? '✍️ Initials Required' : 'No Initials'}
-              </div>
-            </div>
-            <div class="admin-actions">
-              <button onclick="deleteTask(${t.id})" class="btn-danger btn-small">🗑️ Delete</button>
-            </div>
-          </div>
-        `).join('') || '<p style="text-align: center; color: var(--text-muted);">No tasks match this filter.</p>';
+        const totalCount = validTasks.length;
+        const completedCount = completedDetailsText.length;
+        const ratePercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+        const summaryText = completedDetailsText.length > 0 ? completedDetailsText.join('\n\n') : 'No completed tasks recorded today.';
+
+        if (typeof emailjs !== 'undefined' && EMAILJS_PUBLIC_KEY !== 'YOUR_EMAILJS_PUBLIC_KEY') {
+          await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+            day: currentSelectedDay.toUpperCase(),
+            report_date: currentSelectedDateISO,
+            completion_rate: `${ratePercent}%`,
+            completed_count: completedCount,
+            total_count: totalCount,
+            summary_details: summaryText
+          });
+          alert('✓ EOD Summary Email dispatched successfully!');
+        } else {
+          alert(`EOD Summary for ${currentSelectedDay.toUpperCase()} (${currentSelectedDateISO}):\nCompleted: ${completedCount}/${totalCount} (${ratePercent}%)\n\n${summaryText}`);
+        }
       } catch (err) {
-        console.error('Admin task load error:', err);
+        alert('Error sending EOD summary email: ' + (err.message || err));
+      }
+    };
+
+    window.loadStaffPerformance = async function(isSilent = false) {
+      const container = document.getElementById('staff-performance-container');
+      if (!isSilent && container) {
+        container.innerHTML = `<p style="text-align: center; color: var(--text-muted);">Loading staff performance statistics...</p>`;
+      }
+
+      const { data: completions, error } = await supabaseClient
+        .from('task_completions')
+        .select('initials, completed_date');
+
+      if (error || !completions) {
+        if (container) container.innerHTML = `<p class="error-message">Could not load performance stats.</p>`;
+        return;
+      }
+
+      const counts = {};
+      completions.forEach(c => {
+        const init = (c.initials || 'UNKNOWN').toUpperCase();
+        counts[init] = (counts[init] || 0) + 1;
+      });
+
+      const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+
+      if (sorted.length === 0) {
+        if (container) container.innerHTML = `<p style="text-align: center; color: var(--text-muted);">No task completion data recorded yet.</p>`;
+        return;
+      }
+
+      const html = sorted.map(([initials, count], index) => `
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0.8rem; background: var(--bg-input); border-radius: 8px; margin-bottom: 0.5rem;">
+          <span style="font-weight: 700; color: ${index === 0 ? 'var(--warning)' : 'var(--text-light)'};">
+            ${index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '👤'} ${initials}
+          </span>
+          <span style="font-weight: 800; color: var(--flipout-green);">${count} tasks</span>
+        </div>
+      `).join('');
+
+      if (container) container.innerHTML = html;
+    };
+
+    window.loadBackOfficeQuestions = async function(isSilent = false) {
+      const listEl = document.getElementById('backoffice-questions-list');
+      if (!isSilent && listEl) {
+        listEl.innerHTML = `<p style="text-align: center; color: var(--text-muted);">Loading questions...</p>`;
+      }
+
+      const { data: questions, error } = await supabaseClient
+        .from('eod_questions')
+        .select('*')
+        .order('id', { ascending: true });
+
+      if (error || !questions) {
+        if (listEl) listEl.innerHTML = `<p class="error-message">Failed to load EOD questions.</p>`;
+        return;
+      }
+
+      if (questions.length === 0) {
+        if (listEl) listEl.innerHTML = `<p style="text-align: center; color: var(--text-muted);">No operational questions configured.</p>`;
+        return;
+      }
+
+      const html = questions.map(q => `
+        <div class="admin-task-item">
+          <div>
+            <div style="font-weight: 600; font-size: 0.95rem;">${q.question_text}</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted);">Type: ${q.question_type} | Status: ${q.is_active ? 'Active' : 'Inactive'}</div>
+          </div>
+          <div class="admin-actions">
+            <button onclick="editQuestion(${q.id}, '${q.question_text.replace(/'/g, "\\'")}', '${q.question_type}', ${q.is_active})" class="btn-secondary btn-small">Edit</button>
+            <button onclick="deleteQuestion(${q.id})" class="btn-danger btn-small">Delete</button>
+          </div>
+        </div>
+      `).join('');
+
+      if (listEl) listEl.innerHTML = html;
+    };
+
+    async function handleQuestionFormSubmit(e) {
+      e.preventDefault();
+      dismissKeyboard();
+      const id = document.getElementById('editing-question-id').value;
+      const text = document.getElementById('new-question-text').value.trim();
+      const type = document.getElementById('new-question-type').value;
+      const isActive = document.getElementById('new-question-active').checked;
+      const msgDiv = document.getElementById('question-form-msg');
+
+      if (!text) return;
+
+      let res;
+      if (id) {
+        res = await supabaseClient.from('eod_questions').update({
+          question_text: text,
+          question_type: type,
+          is_active: isActive
+        }).eq('id', id);
+      } else {
+        res = await supabaseClient.from('eod_questions').insert([{
+          question_text: text,
+          question_type: type,
+          is_active: isActive
+        }]);
+      }
+
+      if (res.error) {
+        msgDiv.className = 'error-message';
+        msgDiv.textContent = 'Error: ' + res.error.message;
+      } else {
+        msgDiv.className = 'success-message';
+        msgDiv.textContent = id ? '✓ Question updated!' : '✓ Question added!';
+        cancelEditQuestion();
+        loadBackOfficeQuestions();
       }
     }
 
-    function filterAdminTasks(dayFilter, btnEl) {
-      activeAdminFilter = dayFilter;
-      document.querySelectorAll('.admin-filter-tab').forEach(b => b.classList.remove('active'));
-      btnEl.classList.add('active');
-      loadAdminTasks(true);
-    }
+    window.editQuestion = function(id, text, type, isActive) {
+      document.getElementById('editing-question-id').value = id;
+      document.getElementById('new-question-text').value = text;
+      document.getElementById('new-question-type').value = type;
+      document.getElementById('new-question-active').checked = isActive;
+      document.getElementById('save-question-btn').textContent = 'Update Question';
+      document.getElementById('cancel-question-edit-btn').classList.remove('hidden');
+    };
 
-    async function handleTaskFormSubmit(isTemporary) {
+    window.cancelEditQuestion = function() {
+      document.getElementById('eod-question-form').reset();
+      document.getElementById('editing-question-id').value = '';
+      document.getElementById('save-question-btn').textContent = '+ Add Question';
+      document.getElementById('cancel-question-edit-btn').classList.add('hidden');
+      document.getElementById('question-form-msg').textContent = '';
+    };
+
+    window.deleteQuestion = async function(id) {
+      if (!confirm('Are you sure you want to delete this question?')) return;
+      const { error } = await supabaseClient.from('eod_questions').delete().eq('id', id);
+      if (error) {
+        alert('Error deleting question: ' + error.message);
+      } else {
+        loadBackOfficeQuestions();
+      }
+    };
+
+    window.filterAdminTasks = function(filterDay, tabEl) {
+      activeAdminFilter = filterDay;
+      adminFilterTabs.forEach(tab => tab.classList.remove('active'));
+      tabEl.classList.add('active');
+      loadAdminTasks();
+    };
+
+    window.loadAdminTasks = async function(isSilent = false) {
+      if (!isSilent) {
+        adminTaskList.innerHTML = `<p style="text-align: center; color: var(--text-muted);">Loading tasks...</p>`;
+      }
+
+      const { data: tasks, error } = await supabaseClient
+        .from('tasks')
+        .select('*')
+        .order('sort_order', { ascending: true });
+
+      if (error) {
+        if (adminTaskList) adminTaskList.innerHTML = `<p class="error-message">Error loading tasks: ${error.message}</p>`;
+        return;
+      }
+
+      allLoadedTasks = tasks || [];
+
+      // Pending Approval Tasks (for Admins)
+      const unapproved = allLoadedTasks.filter(t => !t.is_approved);
+      if (unapproved.length > 0 && currentUserRole === 'admin') {
+        approvalQueueSection.classList.remove('hidden');
+        approvalTaskList.innerHTML = unapproved.map(t => `
+          <div class="admin-task-item" style="border-color: var(--warning);">
+            <div>
+              <div style="font-weight: 700;">${t.title}</div>
+              <div style="font-size: 0.8rem; color: var(--text-muted);">Category: ${t.category} | Days: ${(t.days || []).join(', ')}</div>
+            </div>
+            <div class="admin-actions">
+              <button onclick="approveTask('${t.id}')" class="btn-success btn-small">Approve</button>
+              <button onclick="rejectTask('${t.id}')" class="btn-danger btn-small">Reject</button>
+            </div>
+          </div>
+        `).join('');
+      } else {
+        approvalQueueSection.classList.add('hidden');
+      }
+
+      // Approved Tasks Filtered
+      const filtered = allLoadedTasks.filter(t => {
+        if (!t.is_approved) return false;
+        if (activeAdminFilter === 'all') return true;
+        return (t.days || []).includes(activeAdminFilter);
+      });
+
+      if (filtered.length === 0) {
+        adminTaskList.innerHTML = `<p style="text-align: center; color: var(--text-muted);">No tasks found for this filter.</p>`;
+        return;
+      }
+
+      adminTaskList.innerHTML = filtered.map(t => `
+        <div class="admin-task-item">
+          <div>
+            <div style="font-weight: 700;">${t.is_temporary ? '⚡ [Temp] ' : ''}${t.title}</div>
+            <div style="font-size: 0.8rem; color: var(--text-muted);">
+              Cat: ${t.category} | Days: ${t.is_temporary ? 'Today Only' : (t.days || []).join(', ')} | Initials: ${t.requires_initials ? 'Yes' : 'No'} | Photo: ${t.requires_photo ? 'Yes' : 'No'}
+            </div>
+          </div>
+          <div class="admin-actions">
+            <button onclick="editTask('${t.id}')" class="btn-secondary btn-small">Edit</button>
+            <button onclick="deleteTask('${t.id}')" class="btn-danger btn-small">Delete</button>
+          </div>
+        </div>
+      `).join('');
+    };
+
+    window.handleTaskFormSubmit = async function(isTemporary = false) {
       dismissKeyboard();
+      const taskId = document.getElementById('editing-task-id').value;
       const title = document.getElementById('new-task-title').value.trim();
       const category = document.getElementById('new-task-category').value;
       const maxPhotos = parseInt(document.getElementById('new-task-photos-count').value) || 1;
@@ -2410,100 +2557,116 @@
         return;
       }
 
-      let selectedDays = [];
-      if (isTemporary) {
-        selectedDays = [getMelbourneDayName()];
-      } else {
-        document.querySelectorAll('.day-check:checked').forEach(cb => selectedDays.push(cb.value));
-        if (selectedDays.length === 0) {
-          alert('Please select at least one active day for permanent jobs.');
-          return;
-        }
+      const selectedDays = [];
+      document.querySelectorAll('.day-check:checked').forEach(cb => selectedDays.push(cb.value));
+
+      if (!isTemporary && selectedDays.length === 0 && !taskId) {
+        alert('Please select at least one active day for permanent jobs.');
+        return;
       }
 
-      const newTask = {
+      const isApproved = (currentUserRole === 'admin') || isTemporary;
+
+      const payload = {
         title,
         category,
-        days: selectedDays,
+        max_photos: maxPhotos,
         requires_photo: requiresPhoto,
         requires_initials: requiresInitials,
-        max_photos: maxPhotos,
-        is_approved: isTemporary || currentUserRole === 'admin',
+        days: isTemporary ? [currentSelectedDay] : selectedDays,
         is_temporary: isTemporary,
-        created_date: currentSelectedDateISO
+        is_approved: isApproved,
+        created_for_date: isTemporary ? currentSelectedDateISO : null
       };
 
-      try {
-        const { error } = await supabaseClient.from('tasks').insert([newTask]);
-        if (error) throw error;
-
-        alert(isTemporary ? '✓ Temporary task added for today!' : '✓ Permanent job request submitted!');
-        document.getElementById('task-form').reset();
-        loadAdminTasks();
-      } catch (err) {
-        alert('Error saving task: ' + err.message);
+      let res;
+      if (taskId) {
+        res = await supabaseClient.from('tasks').update(payload).eq('id', taskId);
+      } else {
+        res = await supabaseClient.from('tasks').insert([payload]);
       }
-    }
 
-    async function approveTask(taskId) {
-      try {
-        const { error } = await supabaseClient
-          .from('tasks')
-          .update({ is_approved: true })
-          .eq('id', taskId);
-
-        if (error) throw error;
+      if (res.error) {
+        alert('Error saving task: ' + res.error.message);
+      } else {
+        alert(isApproved ? '✓ Task saved successfully!' : '📩 Request submitted for admin approval!');
+        cancelEditTask();
         loadAdminTasks();
-      } catch (err) {
-        alert('Error approving task: ' + err.message);
       }
-    }
+    };
 
-    async function rejectTask(taskId) {
-      if (!confirm('Reject and remove this task request?')) return;
-      deleteTask(taskId);
-    }
+    window.editTask = function(id) {
+      const task = allLoadedTasks.find(t => t.id === id);
+      if (!task) return;
 
-    async function deleteTask(taskId) {
+      document.getElementById('editing-task-id').value = task.id;
+      document.getElementById('form-heading').textContent = 'Edit Job';
+      document.getElementById('new-task-title').value = task.title;
+      document.getElementById('new-task-category').value = task.category;
+      document.getElementById('new-task-photos-count').value = task.max_photos || 1;
+      document.getElementById('new-task-photo').checked = task.requires_photo;
+      document.getElementById('new-task-initials').checked = task.requires_initials;
+
+      document.querySelectorAll('.day-check').forEach(cb => {
+        cb.checked = (task.days || []).includes(cb.value);
+      });
+
+      document.getElementById('cancel-edit-btn').classList.remove('hidden');
+    };
+
+    window.cancelEditTask = function() {
+      document.getElementById('task-form').reset();
+      document.getElementById('editing-task-id').value = '';
+      document.getElementById('form-heading').textContent = 'Add Job';
+      document.getElementById('cancel-edit-btn').classList.add('hidden');
+    };
+
+    window.deleteTask = async function(id) {
       if (!confirm('Are you sure you want to delete this task?')) return;
-      try {
-        const { error } = await supabaseClient.from('tasks').delete().eq('id', taskId);
-        if (error) throw error;
+      const { error } = await supabaseClient.from('tasks').delete().eq('id', id);
+      if (error) {
+        alert('Error deleting task: ' + error.message);
+      } else {
         loadAdminTasks();
-      } catch (err) {
-        alert('Error deleting task: ' + err.message);
       }
-    }
+    };
 
-    async function exportCompletionsToCSV() {
-      try {
-        const { data, error } = await supabaseClient
-          .from('completions')
-          .select('*, tasks(title, category)')
-          .order('completion_date', { ascending: false });
+    window.approveTask = async function(id) {
+      const { error } = await supabaseClient.from('tasks').update({ is_approved: true }).eq('id', id);
+      if (error) alert('Error approving task: ' + error.message);
+      else loadAdminTasks();
+    };
 
-        if (error) throw error;
+    window.rejectTask = async function(id) {
+      if (!confirm('Reject and delete this job request?')) return;
+      const { error } = await supabaseClient.from('tasks').delete().eq('id', id);
+      if (error) alert('Error rejecting task: ' + error.message);
+      else loadAdminTasks();
+    };
 
-        let csvContent = 'data:text/csv;charset=utf-8,ID,Date,Category,Task,Completed By,Completed At\n';
-        data.forEach(r => {
-          csvContent += `"${r.id}","${r.completion_date}","${r.tasks?.category || ''}","${r.tasks?.title || ''}","${r.completed_by}","${r.completed_at}"\n`;
-        });
-
-        const encodedUri = encodeURI(csvContent);
-        const link = document.createElement('a');
-        link.setAttribute('href', encodedUri);
-        link.setAttribute('download', `flipout_completions_${getMelbourneTodayISO()}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      } catch (err) {
-        alert('Export error: ' + err.message);
+    window.exportCompletionsToCSV = async function() {
+      const { data, error } = await supabaseClient.from('task_completions').select('*');
+      if (error || !data || data.length === 0) {
+        alert('No completion records to export.');
+        return;
       }
-    }
 
-    async function sendEODSummaryEmail(isManual = false) {
-      showEODReportScreen();
-    }
+      let csv = 'ID,Task ID,Completed Date,Initials,Photo URL\n';
+      data.forEach(row => {
+        csv += `"${row.id}","${row.task_id}","${row.completed_date}","${row.initials || ''}","${row.photo_url || ''}"\n`;
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.setAttribute('href', url);
+      a.setAttribute('download', `task_completions_${currentSelectedDateISO}.csv`);
+      a.click();
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+      initialiseApp();
+    });
   </script>
 </body>
 </html>

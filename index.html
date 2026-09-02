@@ -66,7 +66,7 @@
       min-height: 100vh;
     }
 
-    /* Container Gradient Border Fix (Replaced border-image to eliminate visual line artifacts) */
+    /* Container Gradient Border Fix */
     .container {
       width: 100%;
       max-width: 760px;
@@ -384,7 +384,7 @@
       letter-spacing: 0.5px;
     }
 
-    /* EOD REPORT FORM STYLING MATCHING PDF */
+    /* EOD REPORT FORM STYLING */
     .eod-card {
       background: var(--bg-card-alt);
       border-radius: 14px;
@@ -1411,7 +1411,7 @@
     const SUPABASE_ANON_KEY = 'sb_publishable_PxJuEvkUbVmqNlcq-E2sPg_VBn5vI3F';
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // EmailJS Configuration - Properly Linked to Email Service
+    // EmailJS Configuration
     const EMAILJS_PUBLIC_KEY = 'kxng6zTg7LBwLYGBU'; 
     const EMAILJS_SERVICE_ID = 'service_0alkyrv';
     const EMAILJS_TEMPLATE_ID = 'template_ehvz1nm';
@@ -2343,24 +2343,28 @@
             grand_total: reportData.grand_total,
             operational_questions: questionAnswers.map(qa => `• ${qa.question}: ${qa.answer}`).join('\n')
           };
-
           await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_EOD_TEMPLATE_ID, templateParams, EMAILJS_PUBLIC_KEY);
         }
 
         msgDiv.className = 'success-message';
-        msgDiv.textContent = '✓ EOD Report submitted and dispatched successfully!';
-        triggerRewardEffect();
+        msgDiv.textContent = '✓ End of Day Report submitted successfully!';
+        
+        document.getElementById('eod-takings-form').reset();
+        workersToday = [];
+        renderWorkersList();
+        localStorage.removeItem(getEODQuestionsStateKey());
+        renderEODOperationalQuestions();
       } catch (err) {
         msgDiv.className = 'error-message';
-        msgDiv.textContent = 'Submission error: ' + (err.message || 'Failed to dispatch report');
+        msgDiv.textContent = 'Submission error: ' + (err.message || err);
       }
     }
 
-    // MAIN CHECKLIST & DAY SELECTOR WITH SUPABASE INTEGRATION
-    window.selectDay = async function(dayName, isAutoRefresh = false) {
+    // TASK LISTING & DAY SELECTOR CONTROLLER
+    window.selectDay = async function(dayName, isSilent = false) {
       currentSelectedDay = dayName.toLowerCase();
       currentSelectedDateISO = getDateForDayOfWeek(currentSelectedDay);
-
+      
       mainDayTabs.forEach(tab => {
         if (tab.dataset.day === currentSelectedDay) {
           tab.classList.add('active');
@@ -2369,200 +2373,219 @@
         }
       });
 
-      const dateParts = currentSelectedDateISO.split('-');
-      const formattedDate = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
       const titleEl = document.getElementById('active-day-title');
       if (titleEl) {
-        titleEl.textContent = `${currentSelectedDay.toUpperCase()} (${formattedDate})`;
+        titleEl.textContent = `${currentSelectedDay.charAt(0).toUpperCase() + currentSelectedDay.slice(1)}'s Tasks`;
       }
 
-      await loadPendingAndCompletedTasks(currentSelectedDay, isAutoRefresh);
+      await loadTasksForDay(currentSelectedDay, isSilent);
     };
 
-    async function loadPendingAndCompletedTasks(dayName, isAutoRefresh = false) {
-      if (!isAutoRefresh && pendingTasksContainer) {
-        pendingTasksContainer.innerHTML = `<p style="text-align: center; color: var(--text-muted);">Loading tasks from database...</p>`;
+    async function loadTasksForDay(dayName, isSilent = false) {
+      if (!isSilent) {
+        pendingTasksContainer.innerHTML = '<p style="text-align: center; color: var(--text-muted);">Loading tasks...</p>';
       }
 
       try {
-        const { data: tasksData, error: tasksErr } = await supabaseClient
+        const { data: tasks, error: taskError } = await supabaseClient
           .from('tasks')
-          .select('*')
-          .eq('is_approved', true)
-          .or(`days.cs.{${dayName}},and(is_temporary.eq.true,created_for_date.eq.${currentSelectedDateISO})`)
-          .order('sort_order', { ascending: true });
+          .select('*');
 
-        if (tasksErr) throw tasksErr;
+        if (taskError) throw taskError;
 
-        const validTasks = (tasksData || []).filter(t => !t.is_temporary || t.created_for_date === currentSelectedDateISO);
-        allLoadedTasks = validTasks;
-
-        const { data: completionsData, error: compErr } = await supabaseClient
+        const { data: completions, error: compError } = await supabaseClient
           .from('task_completions')
           .select('*')
-          .eq('completed_date', currentSelectedDateISO);
+          .eq('date', currentSelectedDateISO);
 
-        if (compErr) throw compErr;
+        if (compError) throw compError;
 
-        const completionMap = new Map();
-        (completionsData || []).forEach(c => completionMap.set(c.task_id, c));
-
-        const pendingList = [];
-        const completedList = [];
-
-        validTasks.forEach(task => {
-          if (completionMap.has(task.id)) {
-            completedList.push({ task, completion: completionMap.get(task.id) });
-          } else {
-            pendingList.push(task);
-          }
+        const completionMap = {};
+        (completions || []).forEach(c => {
+          completionMap[c.task_id] = c;
         });
 
-        // Update progress bar
-        const totalCount = validTasks.length;
-        const completedCount = completedList.length;
-        const percent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+        const dayTasks = (tasks || []).filter(task => {
+          if (task.status === 'pending_approval') return false;
+          if (task.is_temporary) {
+            return task.temp_date === currentSelectedDateISO;
+          }
+          if (Array.isArray(task.days)) {
+            return task.days.includes(dayName);
+          } else if (typeof task.days === 'string') {
+            return task.days.toLowerCase().includes(dayName);
+          }
+          return true;
+        });
 
-        document.getElementById('progress-percent').textContent = `${percent}%`;
-        document.getElementById('progress-bar-fill').style.width = `${percent}%`;
-
-        renderPendingTasks(pendingList);
-        renderCompletedTasks(completedList);
+        allLoadedTasks = dayTasks;
+        renderTasksList(dayTasks, completionMap);
       } catch (err) {
-        console.error('Task Loading Error:', err);
-        if (pendingTasksContainer) {
+        console.error('Error loading tasks:', err);
+        if (!isSilent) {
           pendingTasksContainer.innerHTML = `<p class="error-message">Failed to load tasks: ${escapeHtml(err.message)}</p>`;
         }
       }
     }
 
-    function renderPendingTasks(tasks) {
-      if (!pendingTasksContainer) return;
-      if (tasks.length === 0) {
-        pendingTasksContainer.innerHTML = `<p style="text-align: center; color: var(--flipout-green); font-weight: bold; padding: 1rem;">🎉 All tasks completed for today!</p>`;
-        return;
+    function renderTasksList(tasks, completionMap) {
+      const pendingTasks = [];
+      const completedTasks = [];
+
+      tasks.forEach(task => {
+        const comp = completionMap[task.id];
+        if (comp) {
+          completedTasks.push({ task, comp });
+        } else {
+          pendingTasks.push(task);
+        }
+      });
+
+      const totalCount = tasks.length;
+      const completedCount = completedTasks.length;
+      const percent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+      const percentLabel = document.getElementById('progress-percent');
+      const barFill = document.getElementById('progress-bar-fill');
+      if (percentLabel) percentLabel.textContent = `${percent}%`;
+      if (barFill) barFill.style.width = `${percent}%`;
+
+      if (pendingTasks.length === 0) {
+        pendingTasksContainer.innerHTML = `<p style="text-align: center; color: var(--flipout-green); font-weight: bold; margin: 2rem 0;">🎉 All tasks completed for ${currentSelectedDay.toUpperCase()}!</p>`;
+      } else {
+        pendingTasksContainer.innerHTML = pendingTasks.map(task => renderTaskCard(task, null)).join('');
       }
 
-      pendingTasksContainer.innerHTML = tasks.map(task => {
-        const isPhotoReq = task.requires_photo;
-        const maxPhotos = task.max_photos || 1;
-        const currentUploaded = stagedPhotos[task.id] || [];
+      if (completedTasks.length > 0) {
+        completedSection.classList.remove('hidden');
+        completedTasksContainer.innerHTML = completedTasks.map(({ task, comp }) => renderTaskCard(task, comp)).join('');
+      } else {
+        completedSection.classList.add('hidden');
+        completedTasksContainer.innerHTML = '';
+      }
+    }
 
-        return `
-          <div class="task-card" id="task-card-${task.id}">
-            <div class="task-main">
-              <input type="checkbox" class="task-checkbox" onchange="handleTaskCheck('${task.id}', true)">
-              <div class="task-label">
-                ${escapeHtml(task.title)}
-                ${task.is_temporary ? `<span class="badge-temp">Temp Job</span>` : ''}
-              </div>
+    function renderTaskCard(task, comp) {
+      const isCompleted = !!comp;
+      const photos = isCompleted ? parsePhotoUrls(comp.photo_url || comp.photo_urls) : (stagedPhotos[task.id] || []);
+      const initialsVal = isCompleted ? escapeHtml(comp.initials || comp.completed_by || '') : '';
+      const maxPhotos = task.max_photos || 1;
+
+      return `
+        <div class="task-card ${isCompleted ? 'completed' : ''}" id="task-card-${task.id}">
+          <div class="task-main">
+            <input type="checkbox" class="task-checkbox" ${isCompleted ? 'checked' : ''} onchange="toggleTaskCompletion('${task.id}', this.checked)">
+            <div class="task-label">
+              <strong>${escapeHtml(task.title)}</strong>
+              <span style="font-size: 0.75rem; color: var(--flipout-pink); margin-left: 6px;">[${escapeHtml(task.category || 'General')}]</span>
+              ${task.is_temporary ? '<span class="badge-temp" style="margin-left: 6px;">TEMP</span>' : ''}
             </div>
-            <div class="task-meta">
-              <input type="text" id="initials-${task.id}" class="initials-input" placeholder="Staff Name + Initial *" required />
-              ${isPhotoReq ? `
+          </div>
+          <div class="task-meta">
+            ${task.requires_initials !== false ? `
+              <input type="text" id="initials-${task.id}" class="initials-input" placeholder="Full Name + Initial" value="${initialsVal}" ${isCompleted ? 'readonly' : ''} />
+            ` : ''}
+            
+            ${task.requires_photo ? `
+              ${!isCompleted ? `
                 <label class="photo-upload-btn">
-                  📷 Upload Photo (${currentUploaded.length}/${maxPhotos})
-                  <input type="file" accept="image/*" capture="environment" style="display:none;" onchange="uploadTaskPhoto('${task.id}', this)" />
+                  📷 Upload Photo (${photos.length}/${maxPhotos})
+                  <input type="file" accept="image/*" capture="environment" style="display:none;" onchange="handlePhotoUpload('${task.id}', this)">
                 </label>
               ` : ''}
-            </div>
+              ${photos.map((url, i) => `
+                <a href="${url}" target="_blank" class="view-photo-btn">🖼️ View Photo ${photos.length > 1 ? i + 1 : ''}</a>
+              `).join('')}
+            ` : ''}
           </div>
-        `;
-      }).join('');
+        </div>
+      `;
     }
 
-    function renderCompletedTasks(completedItems) {
-      if (!completedTasksContainer || !completedSection) return;
-      if (completedItems.length === 0) {
-        completedSection.classList.add('hidden');
-        return;
-      }
-
-      completedSection.classList.remove('hidden');
-      completedTasksContainer.innerHTML = completedItems.map(({ task, completion }) => {
-        const photoUrls = parsePhotoUrls(completion.photo_url);
-        return `
-          <div class="task-card completed" id="task-card-${task.id}">
-            <div class="task-main">
-              <input type="checkbox" class="task-checkbox" checked onchange="handleTaskCheck('${task.id}', false)">
-              <div class="task-label">${escapeHtml(task.title)}</div>
-            </div>
-            <div class="task-meta">
-              <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">👤 Completed by: ${escapeHtml(completion.completed_by)}</span>
-              ${photoUrls.map((url, i) => `<a href="${url}" target="_blank" class="view-photo-btn">🖼️ View Photo ${i + 1}</a>`).join('')}
-            </div>
-          </div>
-        `;
-      }).join('');
-    }
-
-    window.uploadTaskPhoto = async function(taskId, inputEl) {
-      if (!inputEl.files || inputEl.files.length === 0) return;
+    window.handlePhotoUpload = async function(taskId, inputEl) {
       const file = inputEl.files[0];
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${taskId}_${Date.now()}.${fileExt}`;
-      const filePath = `task_photos/${fileName}`;
+      if (!file) return;
+
+      const btnLabel = inputEl.parentElement;
+      const originalText = btnLabel.innerHTML;
+      btnLabel.innerHTML = '⏳ Uploading...';
 
       try {
-        const { error: uploadError } = await supabaseClient.storage.from('task-photos').upload(filePath, file);
-        if (uploadError) throw uploadError;
+        const fileExt = file.name.split('.').pop();
+        const fileName = `task_${taskId}_${Date.now()}.${fileExt}`;
+        const filePath = `completions/${fileName}`;
 
-        const { data: publicUrlData } = supabaseClient.storage.from('task-photos').getPublicUrl(filePath);
-        const url = publicUrlData.publicUrl;
+        const { data, error } = await supabaseClient
+          .storage
+          .from('task-photos')
+          .upload(filePath, file);
+
+        if (error) throw error;
+
+        const { data: publicUrlData } = supabaseClient
+          .storage
+          .from('task-photos')
+          .getPublicUrl(filePath);
+
+        const publicUrl = publicUrlData.publicUrl;
 
         if (!stagedPhotos[taskId]) stagedPhotos[taskId] = [];
-        stagedPhotos[taskId].push(url);
+        stagedPhotos[taskId].push(publicUrl);
 
-        alert('✓ Photo uploaded successfully!');
         selectDay(currentSelectedDay, true);
       } catch (err) {
         alert('Photo upload failed: ' + err.message);
+        btnLabel.innerHTML = originalText;
       }
     };
 
-    window.handleTaskCheck = async function(taskId, isCompleting) {
-      const task = allLoadedTasks.find(t => t.id === taskId);
-      if (!task) return;
-
-      if (isCompleting) {
+    window.toggleTaskCompletion = async function(taskId, isChecking) {
+      const task = allLoadedTasks.find(t => String(t.id) === String(taskId));
+      
+      if (isChecking) {
+        let initials = '';
         const initialsInput = document.getElementById(`initials-${taskId}`);
-        const initialsRaw = initialsInput ? initialsInput.value.trim() : '';
-
-        if (!initialsRaw) {
-          alert('Please enter your Staff Full Name + Initial (e.g. Joshua T).');
-          selectDay(currentSelectedDay, true);
-          return;
+        if (initialsInput) {
+          initials = initialsInput.value.trim();
         }
 
-        const parsed = parseInitials(initialsRaw);
-        if (parsed.length === 0) {
-          alert('Please enter a valid Staff Full Name + Initial (e.g. Joshua T).');
-          selectDay(currentSelectedDay, true);
-          return;
+        if (task && task.requires_initials !== false) {
+          const parsed = parseInitials(initials);
+          if (parsed.length === 0) {
+            alert('Please enter your Full Name + Initial (e.g. Joshua T) before completing this task.');
+            selectDay(currentSelectedDay, true);
+            return;
+          }
+        }
+
+        if (task && task.requires_photo) {
+          const photos = stagedPhotos[taskId] || [];
+          if (photos.length === 0) {
+            alert('Please upload at least one photo before completing this task.');
+            selectDay(currentSelectedDay, true);
+            return;
+          }
         }
 
         const photos = stagedPhotos[taskId] || [];
-        if (task.requires_photo && photos.length === 0) {
-          alert('Photo upload is required for this task.');
-          selectDay(currentSelectedDay, true);
-          return;
-        }
-
-        const completedByStr = parsed.join(', ');
 
         try {
-          const { error } = await supabaseClient.from('task_completions').insert([{
-            task_id: taskId,
-            completed_date: currentSelectedDateISO,
-            completed_by: completedByStr,
-            photo_url: JSON.stringify(photos)
-          }]);
+          const { error } = await supabaseClient
+            .from('task_completions')
+            .insert([{
+              task_id: taskId,
+              date: currentSelectedDateISO,
+              initials: initials,
+              photo_url: photos.length > 0 ? JSON.stringify(photos) : null,
+              completed_at: new Date().toISOString()
+            }]);
 
           if (error) throw error;
+
           triggerRewardEffect();
-          selectDay(currentSelectedDay);
+          await selectDay(currentSelectedDay, true);
         } catch (err) {
-          alert('Failed to save completion: ' + err.message);
+          alert('Failed to save task completion: ' + err.message);
           selectDay(currentSelectedDay, true);
         }
       } else {
@@ -2571,93 +2594,106 @@
             .from('task_completions')
             .delete()
             .eq('task_id', taskId)
-            .eq('completed_date', currentSelectedDateISO);
+            .eq('date', currentSelectedDateISO);
 
           if (error) throw error;
-          selectDay(currentSelectedDay);
+
+          delete stagedPhotos[taskId];
+          await selectDay(currentSelectedDay, true);
         } catch (err) {
-          alert('Failed to uncheck task: ' + err.message);
+          alert('Failed to undo task completion: ' + err.message);
           selectDay(currentSelectedDay, true);
         }
       }
     };
 
-    // BACK OFFICE TASK MANAGEMENT LOGIC
-    async function loadAdminTasks(isAutoRefresh = false) {
+    // BACK OFFICE TASK & JOB MANAGEMENT
+    window.filterAdminTasks = function(filter, element) {
+      activeAdminFilter = filter;
+      adminFilterTabs.forEach(t => t.classList.remove('active'));
+      if (element) element.classList.add('active');
+      loadAdminTasks();
+    };
+
+    window.loadAdminTasks = async function(isSilent = false) {
+      if (!isSilent) {
+        adminTaskList.innerHTML = '<p style="text-align: center; color: var(--text-muted);">Loading tasks...</p>';
+      }
+
       try {
         const { data: tasks, error } = await supabaseClient
           .from('tasks')
           .select('*')
-          .order('sort_order', { ascending: true });
+          .order('id', { ascending: false });
 
         if (error) throw error;
 
-        const pendingApproval = (tasks || []).filter(t => !t.is_approved);
-        const approved = (tasks || []).filter(t => t.is_approved);
+        const pendingApprovalTasks = (tasks || []).filter(t => t.status === 'pending_approval');
+        const activeTasks = (tasks || []).filter(t => t.status !== 'pending_approval');
 
-        if (approvalQueueSection) {
-          if (pendingApproval.length > 0 && currentUserRole === 'admin') {
-            approvalQueueSection.classList.remove('hidden');
-            approvalTaskList.innerHTML = pendingApproval.map(t => `
-              <div class="admin-task-item">
-                <div>
-                  <strong>${escapeHtml(t.title)}</strong>
-                  <div style="font-size: 0.75rem; color: var(--text-muted);">${t.category} | Days: ${(t.days || []).join(', ')}</div>
-                </div>
-                <div class="admin-actions">
-                  <button onclick="approveTask('${t.id}')" class="btn-success btn-small">Approve</button>
-                  <button onclick="rejectTask('${t.id}')" class="btn-danger btn-small">Reject</button>
+        if (currentUserRole === 'admin' && pendingApprovalTasks.length > 0) {
+          approvalQueueSection.classList.remove('hidden');
+          approvalTaskList.innerHTML = pendingApprovalTasks.map(t => `
+            <div class="admin-task-item">
+              <div>
+                <strong>${escapeHtml(t.title)}</strong>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">
+                  Days: ${Array.isArray(t.days) ? t.days.join(', ') : t.days} | Category: ${escapeHtml(t.category)}
                 </div>
               </div>
-            `).join('');
-          } else {
-            approvalQueueSection.classList.add('hidden');
-          }
+              <div class="admin-actions">
+                <button onclick="approveTask('${t.id}')" class="btn-success btn-small">Approve</button>
+                <button onclick="rejectTask('${t.id}')" class="btn-danger btn-small">Reject</button>
+              </div>
+            </div>
+          `).join('');
+        } else {
+          approvalQueueSection.classList.add('hidden');
+          approvalTaskList.innerHTML = '';
         }
 
-        let filtered = approved;
-        if (activeAdminFilter !== 'all') {
-          filtered = approved.filter(t => t.days && t.days.includes(activeAdminFilter));
-        }
+        const filteredTasks = activeTasks.filter(t => {
+          if (activeAdminFilter === 'all') return true;
+          if (t.is_temporary) return true;
+          if (Array.isArray(t.days)) return t.days.includes(activeAdminFilter);
+          if (typeof t.days === 'string') return t.days.toLowerCase().includes(activeAdminFilter);
+          return true;
+        });
 
-        if (adminTaskList) {
-          if (filtered.length === 0) {
-            adminTaskList.innerHTML = `<p style="text-align: center; color: var(--text-muted);">No active tasks for selected filter.</p>`;
-          } else {
-            adminTaskList.innerHTML = filtered.map(t => `
-              <div class="admin-task-item">
-                <div>
-                  <strong>${escapeHtml(t.title)}</strong>
-                  <div style="font-size: 0.75rem; color: var(--text-muted);">${t.category} | ${(t.days || []).join(', ')} ${t.is_temporary ? '(Temp)' : ''}</div>
-                </div>
-                <div class="admin-actions">
-                  <button onclick="editTask('${t.id}')" class="btn-secondary btn-small">Edit</button>
-                  <button onclick="deleteTask('${t.id}')" class="btn-danger btn-small">Delete</button>
+        if (filteredTasks.length === 0) {
+          adminTaskList.innerHTML = '<p style="text-align: center; color: var(--text-muted);">No tasks found for this filter.</p>';
+        } else {
+          adminTaskList.innerHTML = filteredTasks.map(t => `
+            <div class="admin-task-item">
+              <div>
+                <strong>${escapeHtml(t.title)}</strong>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">
+                  ${t.is_temporary ? '🗓️ Temp (' + t.temp_date + ')' : '📅 ' + (Array.isArray(t.days) ? t.days.join(', ') : t.days)} | 📁 ${escapeHtml(t.category || 'General')}
                 </div>
               </div>
-            `).join('');
-          }
+              <div class="admin-actions">
+                <button onclick="editTask('${t.id}')" class="btn-secondary btn-small">Edit</button>
+                <button onclick="deleteTask('${t.id}')" class="btn-danger btn-small">Delete</button>
+              </div>
+            </div>
+          `).join('');
         }
       } catch (err) {
-        console.error('Back Office Load Error:', err);
+        console.error('Failed to load admin tasks:', err);
+        if (!isSilent) {
+          adminTaskList.innerHTML = `<p class="error-message">Error: ${escapeHtml(err.message)}</p>`;
+        }
       }
-    }
-
-    window.filterAdminTasks = function(filter, btnEl) {
-      activeAdminFilter = filter;
-      adminFilterTabs.forEach(t => t.classList.remove('active'));
-      if (btnEl) btnEl.classList.add('active');
-      loadAdminTasks();
     };
 
     window.handleTaskFormSubmit = async function(isTemporary) {
       dismissKeyboard();
+      const editId = document.getElementById('editing-task-id').value;
       const title = document.getElementById('new-task-title').value.trim();
       const category = document.getElementById('new-task-category').value;
-      const maxPhotos = parseInt(document.getElementById('new-task-photos-count').value) || 1;
+      const photosCount = parseInt(document.getElementById('new-task-photos-count').value) || 1;
       const requiresPhoto = document.getElementById('new-task-photo').checked;
       const requiresInitials = document.getElementById('new-task-initials').checked;
-      const editingId = document.getElementById('editing-task-id').value;
 
       if (!title) {
         alert('Please enter a task description.');
@@ -2665,157 +2701,213 @@
       }
 
       const selectedDays = [];
-      document.querySelectorAll('.day-check:checked').forEach(c => selectedDays.push(c.value));
+      document.querySelectorAll('.day-check:checked').forEach(cb => {
+        selectedDays.push(cb.value);
+      });
 
-      if (!isTemporary && selectedDays.length === 0) {
-        alert('Please select at least one active day for permanent jobs.');
+      if (!isTemporary && selectedDays.length === 0 && !editId) {
+        alert('Please select at least one active day for a permanent task.');
         return;
       }
 
-      const isApproved = (currentUserRole === 'admin') || isTemporary;
-
-      const payload = {
+      const taskPayload = {
         title,
         category,
-        max_photos: maxPhotos,
+        max_photos: photosCount,
         requires_photo: requiresPhoto,
         requires_initials: requiresInitials,
-        days: isTemporary ? [currentSelectedDay] : selectedDays,
         is_temporary: isTemporary,
-        created_for_date: isTemporary ? currentSelectedDateISO : null,
-        is_approved: isApproved
+        temp_date: isTemporary ? currentSelectedDateISO : null,
+        days: isTemporary ? [currentSelectedDay] : selectedDays,
+        status: (isTemporary || currentUserRole === 'admin') ? 'approved' : 'pending_approval'
       };
 
       try {
-        if (editingId) {
-          const { error } = await supabaseClient.from('tasks').update(payload).eq('id', editingId);
+        if (editId) {
+          const { error } = await supabaseClient
+            .from('tasks')
+            .update(taskPayload)
+            .eq('id', editId);
           if (error) throw error;
           alert('✓ Task updated successfully!');
         } else {
-          const { error } = await supabaseClient.from('tasks').insert([payload]);
+          const { error } = await supabaseClient
+            .from('tasks')
+            .insert([taskPayload]);
           if (error) throw error;
-          alert(isApproved ? '✓ Task created successfully!' : '📩 Permanent task request submitted for admin approval.');
+
+          if (!isTemporary && currentUserRole !== 'admin') {
+            alert('✓ Permanent task request submitted! It will appear after Admin approval.');
+          } else {
+            alert('✓ Task added successfully!');
+          }
         }
 
         cancelEditTask();
         loadAdminTasks();
       } catch (err) {
-        alert('Error saving task: ' + err.message);
+        alert('Failed to save task: ' + err.message);
       }
     };
 
-    window.editTask = async function(taskId) {
-      const { data: t, error } = await supabaseClient.from('tasks').select('*').eq('id', taskId).single();
-      if (error || !t) return;
+    window.editTask = function(taskId) {
+      const task = allLoadedTasks.find(t => String(t.id) === String(taskId));
+      if (!task) return;
 
-      document.getElementById('editing-task-id').value = t.id;
-      document.getElementById('new-task-title').value = t.title;
-      document.getElementById('new-task-category').value = t.category;
-      document.getElementById('new-task-photos-count').value = t.max_photos || 1;
-      document.getElementById('new-task-photo').checked = t.requires_photo;
-      document.getElementById('new-task-initials').checked = t.requires_initials;
+      document.getElementById('editing-task-id').value = task.id;
+      document.getElementById('new-task-title').value = task.title;
+      document.getElementById('new-task-category').value = task.category || 'Opening';
+      document.getElementById('new-task-photos-count').value = task.max_photos || 1;
+      document.getElementById('new-task-photo').checked = !!task.requires_photo;
+      document.getElementById('new-task-initials').checked = task.requires_initials !== false;
 
-      document.querySelectorAll('.day-check').forEach(c => {
-        c.checked = (t.days || []).includes(c.value);
+      const dayChecks = document.querySelectorAll('.day-check');
+      const taskDays = Array.isArray(task.days) ? task.days : [task.days];
+      dayChecks.forEach(cb => {
+        cb.checked = taskDays.includes(cb.value);
       });
 
-      document.getElementById('form-heading').textContent = 'Edit Job';
+      document.getElementById('form-heading').textContent = 'Edit Task';
       document.getElementById('cancel-edit-btn').classList.remove('hidden');
+      window.scrollTo({ top: document.getElementById('task-form').offsetTop - 20, behaviour: 'smooth' });
     };
 
     window.cancelEditTask = function() {
-      document.getElementById('editing-task-id').value = '';
       document.getElementById('task-form').reset();
+      document.getElementById('editing-task-id').value = '';
       document.getElementById('form-heading').textContent = 'Add Job';
       document.getElementById('cancel-edit-btn').classList.add('hidden');
     };
 
     window.approveTask = async function(taskId) {
       try {
-        const { error } = await supabaseClient.from('tasks').update({ is_approved: true }).eq('id', taskId);
+        const { error } = await supabaseClient
+          .from('tasks')
+          .update({ status: 'approved' })
+          .eq('id', taskId);
         if (error) throw error;
+        alert('✓ Task approved!');
         loadAdminTasks();
       } catch (err) {
-        alert('Approval failed: ' + err.message);
+        alert('Error approving task: ' + err.message);
       }
     };
 
     window.rejectTask = async function(taskId) {
-      window.deleteTask(taskId);
+      if (!confirm('Are you sure you want to reject and delete this task request?')) return;
+      try {
+        const { error } = await supabaseClient
+          .from('tasks')
+          .delete()
+          .eq('id', taskId);
+        if (error) throw error;
+        alert('✓ Task request rejected and removed.');
+        loadAdminTasks();
+      } catch (err) {
+        alert('Error rejecting task: ' + err.message);
+      }
     };
 
     window.deleteTask = async function(taskId) {
       if (!confirm('Are you sure you want to delete this task?')) return;
       try {
-        const { error } = await supabaseClient.from('tasks').delete().eq('id', taskId);
+        const { error } = await supabaseClient
+          .from('tasks')
+          .delete()
+          .eq('id', taskId);
         if (error) throw error;
+        alert('✓ Task deleted!');
         loadAdminTasks();
       } catch (err) {
-        alert('Delete failed: ' + err.message);
+        alert('Error deleting task: ' + err.message);
       }
     };
 
-    // LEADERBOARD PERFORMANCE TRACKER
-    async function loadStaffPerformance(isAutoRefresh = false) {
+    // LEADERBOARD & EXPORT SERVICES
+    window.loadStaffPerformance = async function(isSilent = false) {
       const container = document.getElementById('modal-staff-performance-container');
-      if (!container) return;
+      if (!container && !isSilent) return;
 
       try {
-        const { data: completions, error } = await supabaseClient.from('task_completions').select('*');
+        const { data: completions, error } = await supabaseClient
+          .from('task_completions')
+          .select('*');
+
         if (error) throw error;
 
-        const counts = {};
+        const staffCounts = {};
         (completions || []).forEach(c => {
-          const names = parseInitials(c.completed_by);
-          names.forEach(n => {
-            counts[n] = (counts[n] || 0) + 1;
+          const parsedNames = parseInitials(c.initials || c.completed_by);
+          parsedNames.forEach(name => {
+            staffCounts[name] = (staffCounts[name] || 0) + 1;
           });
         });
 
-        const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+        const sortedStaff = Object.entries(staffCounts).sort((a, b) => b[1] - a[1]);
 
-        if (sorted.length === 0) {
-          container.innerHTML = `<p style="text-align: center; color: var(--text-muted);">No task completion data available yet.</p>`;
-          return;
+        if (container) {
+          if (sortedStaff.length === 0) {
+            container.innerHTML = '<p style="text-align: center; color: var(--text-muted);">No task completion records found yet.</p>';
+          } else {
+            const medals = ['🥇', '🥈', '🥉'];
+            container.innerHTML = sortedStaff.map(([name, count], index) => `
+              <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-card-alt); padding: 0.75rem 1rem; border-radius: 10px; margin-bottom: 0.5rem; border: 1px solid rgba(255,255,255,0.08);">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <span style="font-size: 1.2rem; min-width: 25px;">${medals[index] || `#${index + 1}`}</span>
+                  <strong style="color: #fff; font-size: 0.95rem;">${escapeHtml(name)}</strong>
+                </div>
+                <span style="background: rgba(153, 198, 62, 0.2); color: var(--flipout-green); border: 1px solid var(--flipout-green); padding: 3px 10px; border-radius: 12px; font-weight: bold; font-size: 0.85rem;">
+                  ${count} ${count === 1 ? 'task' : 'tasks'}
+                </span>
+              </div>
+            `).join('');
+          }
         }
-
-        container.innerHTML = sorted.map(([name, count], index) => `
-          <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-card-alt); padding: 0.75rem 1rem; border-radius: 10px; margin-bottom: 0.5rem; border: 1px solid rgba(255,255,255,0.05);">
-            <div style="display: flex; align-items: center; gap: 10px;">
-              <span style="font-weight: 800; font-size: 1rem; color: ${index === 0 ? '#FFD700' : index === 1 ? '#C0C0C0' : index === 2 ? '#CD7F32' : 'var(--text-muted)'}; font-family: 'Unbounded', sans-serif;">#${index + 1}</span>
-              <span style="font-weight: 600; font-size: 0.95rem;">${escapeHtml(name)}</span>
-            </div>
-            <span style="font-weight: 800; color: var(--flipout-green); background: rgba(153,198,62,0.15); padding: 4px 10px; border-radius: 12px; font-size: 0.85rem;">${count} Tasks</span>
-          </div>
-        `).join('');
       } catch (err) {
-        console.error('Leaderboard Error:', err);
-      }
-    }
-
-    // EXPORT TO CSV
-    window.exportCompletionsToCSV = async function() {
-      try {
-        const { data: completions, error } = await supabaseClient.from('task_completions').select('*');
-        if (error) throw error;
-
-        let csv = 'ID,Task ID,Date,Completed By,Photo URL\n';
-        completions.forEach(c => {
-          csv += `"${c.id}","${c.task_id}","${c.completed_date}","${(c.completed_by || '').replace(/"/g, '""')}","${(c.photo_url || '').replace(/"/g, '""')}"\n`;
-        });
-
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = `FlipOut_Task_Completions_${getMelbourneTodayISO()}.csv`;
-        link.click();
-      } catch (err) {
-        alert('Export failed: ' + err.message);
+        console.error('Leaderboard load error:', err);
+        if (container && !isSilent) {
+          container.innerHTML = `<p class="error-message">Error loading leaderboard: ${escapeHtml(err.message)}</p>`;
+        }
       }
     };
 
-    // Initialise app on load
-    window.addEventListener('DOMContentLoaded', initialiseApp);
+    window.exportCompletionsToCSV = async function() {
+      try {
+        const { data: completions, error } = await supabaseClient
+          .from('task_completions')
+          .select('*, tasks(title, category)');
+
+        if (error) throw error;
+
+        if (!completions || completions.length === 0) {
+          alert('No completions available to export.');
+          return;
+        }
+
+        let csvContent = 'data:text/csv;charset=utf-8,ID,Date,Task Title,Category,Completed By,Completed At\n';
+        completions.forEach(c => {
+          const title = c.tasks ? `"${c.tasks.title.replace(/"/g, '""')}"` : 'Unknown Task';
+          const category = c.tasks ? `"${c.tasks.category.replace(/"/g, '""')}"` : 'General';
+          const initials = `"${(c.initials || c.completed_by || '').replace(/"/g, '""')}"`;
+          csvContent += `${c.id},${c.date},${title},${category},${initials},${c.completed_at}\n`;
+        });
+
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement('a');
+        link.setAttribute('href', encodedUri);
+        link.setAttribute('download', `flipout_task_completions_${getMelbourneTodayISO()}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } catch (err) {
+        alert('Export CSV failed: ' + err.message);
+      }
+    };
+
+    // DOM CONTENT LOADED INITIALISATION INVOCATION
+    window.addEventListener('DOMContentLoaded', () => {
+      initialiseApp();
+    });
   </script>
 </body>
 </html>

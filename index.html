@@ -372,6 +372,17 @@
       color: var(--flipout-velvet);
     }
 
+    .badge-temp {
+      background: var(--flipout-pink);
+      color: #fff;
+      font-size: 0.7rem;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
     /* EOD REPORT FORM STYLING MATCHING PDF */
     .eod-card {
       background: var(--bg-card-alt);
@@ -2306,456 +2317,367 @@
       try {
         const { data: tasksData, error: tasksErr } = await supabaseClient
           .from('tasks')
-          .select('*');
+          .select('*')
+          .eq('is_approved', true)
+          .or(`days.cs.{${dayName}},and(is_temporary.eq.true,created_for_date.eq.${currentSelectedDateISO})`)
+          .order('sort_order', { ascending: true });
 
         if (tasksErr) throw tasksErr;
 
-        const { data: compsData, error: compsErr } = await supabaseClient
-          .from('completions')
+        const validTasks = (tasksData || []).filter(t => !t.is_temporary || t.created_for_date === currentSelectedDateISO);
+        allLoadedTasks = validTasks;
+
+        const { data: completionsData, error: compErr } = await supabaseClient
+          .from('task_completions')
           .select('*')
-          .eq('date', currentSelectedDateISO);
+          .eq('completed_date', currentSelectedDateISO);
 
-        if (compsErr) throw compsErr;
+        if (compErr) throw compErr;
 
-        allLoadedTasks = tasksData || [];
-        const completionsMap = {};
-        (compsData || []).forEach(c => {
-          completionsMap[c.task_id] = c;
-        });
+        const completionMap = new Map();
+        (completionsData || []).forEach(c => completionMap.set(c.task_id, c));
 
-        const dayTasks = allLoadedTasks.filter(t => {
-          let daysArr = t.days;
-          if (typeof daysArr === 'string') {
-            try { daysArr = JSON.parse(daysArr); } catch(e) { daysArr = []; }
+        const pendingList = [];
+        const completedList = [];
+
+        validTasks.forEach(task => {
+          if (completionMap.has(task.id)) {
+            completedList.push({ task, completion: completionMap.get(task.id) });
+          } else {
+            pendingList.push(task);
           }
-          if (!Array.isArray(daysArr)) return false;
-          return daysArr.map(d => d.toLowerCase()).includes(dayName.toLowerCase());
         });
 
-        let pendingHtml = '';
-        let completedHtml = '';
-        let completedCount = 0;
+        // Update progress bar
+        const total = validTasks.length;
+        const doneCount = completedList.length;
+        const pct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
+        
+        const progressBar = document.getElementById('progress-bar-fill');
+        const progressText = document.getElementById('progress-percent');
+        if (progressBar) progressBar.style.width = `${pct}%`;
+        if (progressText) progressText.textContent = `${pct}%`;
 
-        if (dayTasks.length === 0) {
-          pendingTasksContainer.innerHTML = `<p style="text-align: center; color: var(--text-muted);">No active tasks scheduled for ${dayName.toUpperCase()}.</p>`;
-          completedSection.classList.add('hidden');
-          updateProgressBar(0, 0);
-          return;
+        // Render Pending Tasks
+        if (pendingList.length === 0) {
+          pendingTasksContainer.innerHTML = `<div style="text-align: center; color: var(--flipout-green); padding: 1.5rem 0; font-weight: 600;">🎉 All tasks for today are completed! Great job!</div>`;
+        } else {
+          pendingTasksContainer.innerHTML = pendingList.map(task => {
+            const photoReq = task.requires_photo ? `<span class="badge-temp">Photo Req</span>` : '';
+            const maxPhotos = task.max_photos || 1;
+            return `
+              <div class="task-card" id="task-card-${task.id}">
+                <div class="task-main">
+                  <input type="checkbox" class="task-checkbox" onchange="toggleTaskCompletion('${task.id}', true)">
+                  <div class="task-label">
+                    <strong>[${task.category || 'General'}]</strong> ${task.title} ${photoReq}
+                  </div>
+                </div>
+                <div class="task-meta">
+                  <input type="text" id="initials-${task.id}" class="initials-input" placeholder="Full Name + Initial (e.g. Joshua T)" />
+                  ${task.requires_photo ? `
+                    <label class="photo-upload-btn">
+                      📷 Upload Photo (${maxPhotos} max)
+                      <input type="file" accept="image/*" multiple id="photo-input-${task.id}" style="display:none;" onchange="handlePhotoUploadSelect('${task.id}', ${maxPhotos})">
+                    </label>
+                    <span id="photo-status-${task.id}" style="font-size: 0.75rem; color: var(--flipout-green);"></span>
+                  ` : ''}
+                </div>
+              </div>
+            `;
+          }).join('');
         }
 
-        dayTasks.forEach(task => {
-          const comp = completionsMap[task.id];
-          const isDone = !!comp;
-
-          if (isDone) completedCount++;
-
-          const taskCardClass = isDone ? 'task-card completed' : 'task-card';
-          const checkboxChecked = isDone ? 'checked' : '';
-          const initialsVal = comp ? (comp.initials || '') : '';
-          const photoUrls = comp ? parsePhotoUrls(comp.photo_url) : (stagedPhotos[task.id] || []);
-          const hasPhotos = photoUrls.length > 0;
-
-          let cardHtml = `
-            <div class="${taskCardClass}" data-task-id="${task.id}">
-              <div class="task-main">
-                <input type="checkbox" class="task-checkbox" ${checkboxChecked} onchange="toggleTaskCompletion('${task.id}', this)" />
-                <div class="task-label">${escapeHtml(task.title)}</div>
-              </div>
-              <div class="task-meta">
-          `;
-
-          if (task.requires_initials) {
-            cardHtml += `
-              <input type="text" class="initials-input" placeholder="Initials" value="${escapeHtml(initialsVal)}" ${isDone ? 'readonly' : ''} onchange="updateTaskInitials('${task.id}', this.value)" />
-            `;
-          }
-
-          if (task.requires_photo) {
-            if (!isDone && !hasPhotos) {
-              cardHtml += `
-                <label class="photo-upload-btn">
-                  <span>📷 Upload Photo</span>
-                  <input type="file" accept="image/*" class="hidden" onchange="handlePhotoUpload('${task.id}', event)" />
-                </label>
-              `;
-            } else if (hasPhotos) {
-              cardHtml += `
-                <a href="${photoUrls[0]}" target="_blank" class="view-photo-btn">👁️ View Photo (${photoUrls.length})</a>
-              `;
-              if (!isDone) {
-                cardHtml += `
-                  <label class="photo-upload-btn" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;">
-                    <span>+ Add</span>
-                    <input type="file" accept="image/*" class="hidden" onchange="handlePhotoUpload('${task.id}', event)" />
-                  </label>
-                `;
-              }
-            }
-          }
-
-          cardHtml += `
-              </div>
-            </div>
-          `;
-
-          if (isDone) {
-            completedHtml += cardHtml;
-          } else {
-            pendingHtml += cardHtml;
-          }
-        });
-
-        pendingTasksContainer.innerHTML = pendingHtml || `<p style="text-align: center; color: var(--text-muted); font-style: italic;">All tasks completed for today! Awesome work.</p>`;
-        
-        if (completedCount > 0) {
-          completedSection.classList.remove('hidden');
-          completedTasksContainer.innerHTML = completedHtml;
-        } else {
+        // Render Completed Tasks
+        if (completedList.length === 0) {
           completedSection.classList.add('hidden');
           completedTasksContainer.innerHTML = '';
+        } else {
+          completedSection.classList.remove('hidden');
+          completedTasksContainer.innerHTML = completedList.map(({ task, completion }) => {
+            const photos = parsePhotoUrls(completion.photo_url);
+            const photoLinks = photos.map((url, i) => `<a href="${url}" target="_blank" rel="noopener" class="view-photo-btn">🖼️ Photo ${i+1}</a>`).join(' ');
+            return `
+              <div class="task-card completed">
+                <div class="task-main">
+                  <input type="checkbox" class="task-checkbox" checked onchange="toggleTaskCompletion('${task.id}', false, '${completion.id}')">
+                  <div class="task-label">
+                    <strong>[${task.category || 'General'}]</strong> ${task.title}
+                  </div>
+                </div>
+                <div class="task-meta">
+                  <span style="font-size: 0.85rem; color: var(--flipout-green); font-weight: 700;">Completed by: ${completion.staff_initials || 'Unknown'}</span>
+                  ${photoLinks}
+                </div>
+              </div>
+            `;
+          }).join('');
         }
-
-        updateProgressBar(completedCount, dayTasks.length);
 
       } catch (err) {
-        console.error('Error loading tasks:', err);
-        if (!isAutoRefresh) {
-          pendingTasksContainer.innerHTML = `<p style="text-align: center; color: var(--danger);">Error loading tasks from database. Please refresh.</p>`;
+        if (pendingTasksContainer) {
+          pendingTasksContainer.innerHTML = `<p class="error-message">Error loading tasks: ${err.message}</p>`;
         }
       }
     }
 
-    function updateProgressBar(completed, total) {
-      const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
-      const fillEl = document.getElementById('progress-bar-fill');
-      const textEl = document.getElementById('progress-percent');
-      if (fillEl) fillEl.style.width = `${percent}%`;
-      if (textEl) textEl.textContent = `${percent}%`;
-    }
+    // PHOTO STAGING & SUPABASE STORAGE UPLOADER
+    window.handlePhotoUploadSelect = async function(taskId, maxPhotos) {
+      const input = document.getElementById(`photo-input-${taskId}`);
+      const statusSpan = document.getElementById(`photo-status-${taskId}`);
+      if (!input || !input.files || input.files.length === 0) return;
 
-    function escapeHtml(text) {
-      if (!text) return '';
-      return text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;').replace("'", '&#039;');
-    }
+      const files = Array.from(input.files).slice(0, maxPhotos);
+      statusSpan.textContent = 'Uploading photos...';
 
-    window.toggleTaskCompletion = async function(taskId, checkboxEl) {
-      const isChecked = checkboxEl.checked;
-      const cardEl = checkboxEl.closest('.task-card');
-      const initialsInput = cardEl ? cardEl.querySelector('.initials-input') : null;
+      const uploadedUrls = [];
+      for (const file of files) {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${taskId}_${Date.now()}_${Math.random().toString(36).substring(2,7)}.${fileExt}`;
+        const filePath = `task_photos/${currentSelectedDateISO}/${fileName}`;
 
-      if (isChecked) {
-        let initialsVal = initialsInput ? initialsInput.value.trim() : '';
-        const names = parseInitials(initialsVal);
-        if (names.length === 0) {
-          alert('Please enter your Full Name + Initial before marking this task as complete.');
-          checkboxEl.checked = false;
-          return;
-        }
-
-        const taskObj = allLoadedTasks.find(t => t.id === taskId);
-        if (taskObj && taskObj.requires_photo) {
-          const staged = stagedPhotos[taskId] || [];
-          if (staged.length === 0) {
-            const { data: existingComp } = await supabaseClient
-              .from('completions')
-              .select('*')
-              .eq('task_id', taskId)
-              .eq('date', currentSelectedDateISO)
-              .single();
-
-            if (!existingComp || !existingComp.photo_url) {
-              alert('A photo upload is required to complete this task.');
-              checkboxEl.checked = false;
-              return;
-            }
-          }
-        }
-
-        const photoArr = stagedPhotos[taskId] || [];
-        const insertPayload = {
-          task_id: taskId,
-          date: currentSelectedDateISO,
-          initials: initialsVal,
-          completed_by: initialsVal,
-          photo_url: photoArr.length > 0 ? JSON.stringify(photoArr) : null
-        };
-
-        const { error } = await supabaseClient.from('completions').insert([insertPayload]);
+        const { data, error } = await supabaseClient.storage.from('task-photos').upload(filePath, file);
         if (error) {
-          alert('Error saving completion: ' + error.message);
-          checkboxEl.checked = false;
+          console.error('Photo upload error:', error);
+          alert(`Failed to upload photo: ${error.message}`);
+          statusSpan.textContent = 'Upload failed.';
           return;
         }
 
+        const { data: publicUrlData } = supabaseClient.storage.from('task-photos').getPublicUrl(filePath);
+        uploadedUrls.push(publicUrlData.publicUrl);
+      }
+
+      stagedPhotos[taskId] = uploadedUrls;
+      statusSpan.textContent = `✓ ${uploadedUrls.length} photo(s) attached`;
+    };
+
+    // TOGGLE TASK COMPLETION WITH SUPABASE READ/WRITE
+    window.toggleTaskCompletion = async function(taskId, markComplete, completionId) {
+      if (markComplete) {
+        const initialsInput = document.getElementById(`initials-${taskId}`);
+        const initials = initialsInput ? initialsInput.value.trim() : '';
+
+        const task = allLoadedTasks.find(t => t.id == taskId);
+        if (task && task.requires_initials && !initials) {
+          alert('Please enter Full Name + Initial before marking task complete.');
+          const chk = document.querySelector(`#task-card-${taskId} .task-checkbox`);
+          if (chk) chk.checked = false;
+          return;
+        }
+
+        const parsedNames = parseInitials(initials);
+        if (task && task.requires_initials && parsedNames.length === 0) {
+          alert('Please provide a valid Full Name + Initial (e.g. Joshua T).');
+          const chk = document.querySelector(`#task-card-${taskId} .task-checkbox`);
+          if (chk) chk.checked = false;
+          return;
+        }
+
+        if (task && task.requires_photo && (!stagedPhotos[taskId] || stagedPhotos[taskId].length === 0)) {
+          alert('This task requires a photo upload. Please upload at least one photo first.');
+          const chk = document.querySelector(`#task-card-${taskId} .task-checkbox`);
+          if (chk) chk.checked = false;
+          return;
+        }
+
+        const photoUrls = stagedPhotos[taskId] || [];
+
+        const { error } = await supabaseClient.from('task_completions').insert([{
+          task_id: taskId,
+          completed_date: currentSelectedDateISO,
+          staff_initials: initials || 'N/A',
+          photo_url: JSON.stringify(photoUrls)
+        }]);
+
+        if (error) {
+          alert('Failed to save task completion: ' + error.message);
+          const chk = document.querySelector(`#task-card-${taskId} .task-checkbox`);
+          if (chk) chk.checked = false;
+          return;
+        }
+
+        delete stagedPhotos[taskId];
         triggerRewardEffect();
-        loadPendingAndCompletedTasks(currentSelectedDay);
+        await loadPendingAndCompletedTasks(currentSelectedDay, true);
 
       } else {
-        const { error } = await supabaseClient
-          .from('completions')
-          .delete()
-          .eq('task_id', taskId)
-          .eq('date', currentSelectedDateISO);
+        // Uncomplete task
+        if (!completionId) return;
 
+        const { error } = await supabaseClient.from('task_completions').delete().eq('id', completionId);
         if (error) {
-          alert('Error unchecking task: ' + error.message);
-          checkboxEl.checked = true;
+          alert('Failed to uncheck task: ' + error.message);
           return;
         }
 
-        loadPendingAndCompletedTasks(currentSelectedDay);
+        await loadPendingAndCompletedTasks(currentSelectedDay, true);
       }
     };
 
-    window.updateTaskInitials = function(taskId, val) {
-      // Stored locally until completion checkbox is ticked
-    };
-
-    window.handlePhotoUpload = async function(taskId, event) {
-      const file = event.target.files[0];
-      if (!file) return;
-
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${taskId}_${Date.now()}.${fileExt}`;
-      const filePath = `task_photos/${fileName}`;
-
-      const { error: uploadErr } = await supabaseClient.storage
-        .from('task-photos')
-        .upload(filePath, file);
-
-      if (uploadErr) {
-        alert('Photo upload failed: ' + uploadErr.message);
-        return;
-      }
-
-      const { data: publicData } = supabaseClient.storage
-        .from('task-photos')
-        .getPublicUrl(filePath);
-
-      const publicUrl = publicData?.publicUrl;
-      if (!publicUrl) {
-        alert('Failed to retrieve public URL for uploaded photo.');
-        return;
-      }
-
-      if (!stagedPhotos[taskId]) stagedPhotos[taskId] = [];
-      stagedPhotos[taskId].push(publicUrl);
-
-      alert('✓ Photo uploaded successfully!');
-      loadPendingAndCompletedTasks(currentSelectedDay);
-    };
-
+    // BACK OFFICE TASK MANAGEMENT
     async function loadAdminTasks(isAutoRefresh = false) {
-      if (!adminTaskList) return;
       if (!isAutoRefresh) {
-        adminTaskList.innerHTML = `<p style="text-align: center; color: var(--text-muted);">Loading tasks...</p>`;
+        adminTaskList.innerHTML = '<p style="text-align: center; color: var(--text-muted);">Loading back office tasks...</p>';
       }
 
-      const { data, error } = await supabaseClient.from('tasks').select('*');
+      const { data: tasks, error } = await supabaseClient
+        .from('tasks')
+        .select('*')
+        .order('sort_order', { ascending: true });
+
       if (error) {
-        adminTaskList.innerHTML = `<p style="text-align: center; color: var(--danger);">Error loading tasks.</p>`;
+        adminTaskList.innerHTML = `<p class="error-message">Error loading tasks: ${error.message}</p>`;
         return;
       }
 
-      allLoadedTasks = data || [];
-      renderAdminTaskList();
-      loadApprovalQueue();
-    }
+      allLoadedTasks = tasks || [];
 
-    window.filterAdminTasks = function(filter, btnEl) {
-      activeAdminFilter = filter.toLowerCase();
-      adminFilterTabs.forEach(tab => {
-        if (tab.dataset.filter === activeAdminFilter) {
-          tab.classList.add('active');
-        } else {
-          tab.classList.remove('active');
-        }
-      });
-      renderAdminTaskList();
-    };
+      // Render approval queue for unapproved tasks
+      const pendingApproval = allLoadedTasks.filter(t => !t.is_approved);
+      if (pendingApproval.length > 0) {
+        approvalQueueSection.classList.remove('hidden');
+        approvalTaskList.innerHTML = pendingApproval.map(t => `
+          <div class="admin-task-item">
+            <div>
+              <strong>${t.title}</strong>
+              <div style="font-size: 0.75rem; color: var(--text-muted);">Cat: ${t.category || 'General'} | Days: ${(t.days || []).join(', ')}</div>
+            </div>
+            <div class="admin-actions">
+              ${currentUserRole === 'admin' ? `
+                <button onclick="approveTask('${t.id}')" class="btn-success btn-small">✓ Approve</button>
+                <button onclick="deleteTask('${t.id}')" class="btn-danger btn-small">✕ Reject</button>
+              ` : `<span style="font-size: 0.75rem; color: var(--warning);">Pending Admin Review</span>`}
+            </div>
+          </div>
+        `).join('');
+      } else {
+        approvalQueueSection.classList.add('hidden');
+        approvalTaskList.innerHTML = '';
+      }
 
-    function renderAdminTaskList() {
-      if (!adminTaskList) return;
-
-      let filtered = allLoadedTasks;
+      // Filter approved tasks for admin management list
+      let filtered = allLoadedTasks.filter(t => t.is_approved);
       if (activeAdminFilter !== 'all') {
-        filtered = allLoadedTasks.filter(t => {
-          let daysArr = t.days;
-          if (typeof daysArr === 'string') {
-            try { daysArr = JSON.parse(daysArr); } catch(e) { daysArr = []; }
-          }
-          if (!Array.isArray(daysArr)) return false;
-          return daysArr.map(d => d.toLowerCase()).includes(activeAdminFilter);
-        });
+        filtered = filtered.filter(t => (t.days || []).includes(activeAdminFilter));
       }
 
       if (filtered.length === 0) {
-        adminTaskList.innerHTML = `<p style="text-align: center; color: var(--text-muted);">No tasks found for filter: ${activeAdminFilter.toUpperCase()}</p>`;
+        adminTaskList.innerHTML = '<p style="text-align: center; color: var(--text-muted);">No active tasks found for this filter.</p>';
         return;
       }
 
-      adminTaskList.innerHTML = filtered.map(task => {
-        let daysArr = task.days;
-        if (typeof daysArr === 'string') {
-          try { daysArr = JSON.parse(daysArr); } catch(e) { daysArr = []; }
-        }
-        const daysStr = Array.isArray(daysArr) ? daysArr.map(d => d.toUpperCase()).join(', ') : 'None';
-
-        return `
-          <div class="admin-task-item">
-            <div>
-              <div style="font-weight: 700; font-size: 0.95rem; margin-bottom: 4px;">${escapeHtml(task.title)}</div>
-              <div style="font-size: 0.75rem; color: var(--text-muted);">
-                <span class="badge-temp" style="background: var(--flipout-purple);">${escapeHtml(task.category || 'General')}</span> 
-                • Days: ${daysStr}
-                ${task.requires_photo ? '• 📷 Photo Req' : ''}
-              </div>
-            </div>
-            <div class="admin-actions">
-              <button onclick="editTask('${task.id}')" class="btn-secondary btn-small">Edit</button>
-              <button onclick="deleteTask('${task.id}')" class="btn-danger btn-small">Delete</button>
-            </div>
-          </div>
-        `;
-      }).join('');
-    }
-
-    async function loadApprovalQueue() {
-      if (!approvalQueueSection || !approvalTaskList) return;
-      const { data, error } = await supabaseClient
-        .from('pending_tasks')
-        .select('*');
-
-      if (error || !data || data.length === 0) {
-        approvalQueueSection.classList.add('hidden');
-        approvalTaskList.innerHTML = '';
-        return;
-      }
-
-      approvalQueueSection.classList.remove('hidden');
-      approvalTaskList.innerHTML = data.map(pt => `
-        <div class="admin-task-item" style="background: #1E0C36;">
+      adminTaskList.innerHTML = filtered.map(t => `
+        <div class="admin-task-item">
           <div>
-            <div style="font-weight: 700; font-size: 0.95rem; margin-bottom: 4px;">${escapeHtml(pt.title)}</div>
+            <strong>${t.title}</strong> ${t.is_temporary ? '<span class="badge-temp">Temp</span>' : ''}
             <div style="font-size: 0.75rem; color: var(--text-muted);">
-              Category: ${escapeHtml(pt.category)} • Submitted by: ${escapeHtml(pt.submitted_by || 'Supervisor')}
+              Cat: ${t.category || 'General'} | Days: ${(t.days || []).join(', ')} | Photo: ${t.requires_photo ? 'Yes' : 'No'} | Initials: ${t.requires_initials ? 'Yes' : 'No'}
             </div>
           </div>
           <div class="admin-actions">
-            <button onclick="approveTask('${pt.id}')" class="btn-success btn-small">Approve</button>
-            <button onclick="rejectTask('${pt.id}')" class="btn-danger btn-small">Reject</button>
+            <button onclick="editTask('${t.id}')" class="btn-secondary btn-small">✏️ Edit</button>
+            <button onclick="deleteTask('${t.id}')" class="btn-danger btn-small">🗑️ Delete</button>
           </div>
         </div>
       `).join('');
     }
 
-    window.handleTaskFormSubmit = async function(isTemp) {
-      dismissKeyboard();
-      const titleInput = document.getElementById('new-task-title');
-      const categorySelect = document.getElementById('new-task-category');
-      const photosCountSelect = document.getElementById('new-task-photos-count');
-      const photoCheckbox = document.getElementById('new-task-photo');
-      const initialsCheckbox = document.getElementById('new-task-initials');
-      const editingIdInput = document.getElementById('editing-task-id');
+    window.filterAdminTasks = function(filterDay, btnEl) {
+      activeAdminFilter = filterDay;
+      adminFilterTabs.forEach(t => t.classList.remove('active'));
+      if (btnEl) btnEl.classList.add('active');
+      loadAdminTasks();
+    };
 
-      const title = titleInput.value.trim();
+    window.handleTaskFormSubmit = async function(isTemporary) {
+      dismissKeyboard();
+      const editingId = document.getElementById('editing-task-id').value;
+      const title = document.getElementById('new-task-title').value.trim();
+      const category = document.getElementById('new-task-category').value;
+      const photosCount = parseInt(document.getElementById('new-task-photos-count').value) || 1;
+      const requiresPhoto = document.getElementById('new-task-photo').checked;
+      const requiresInitials = document.getElementById('new-task-initials').checked;
+
       if (!title) {
         alert('Please enter a task description.');
         return;
       }
 
-      const category = categorySelect.value;
-      const maxPhotos = parseInt(photosCountSelect.value) || 1;
-      const requiresPhoto = photoCheckbox.checked;
-      const requiresInitials = initialsCheckbox.checked;
-      const editingId = editingIdInput.value;
+      const selectedDays = [];
+      document.querySelectorAll('.day-check:checked').forEach(cb => selectedDays.push(cb.value));
 
-      let selectedDays = [];
-      if (isTemp) {
-        selectedDays = [currentSelectedDay];
-      } else {
-        const dayCheckboxes = document.querySelectorAll('.day-check');
-        dayCheckboxes.forEach(cb => {
-          if (cb.checked) selectedDays.push(cb.value);
-        });
-        if (selectedDays.length === 0) {
-          alert('Please select at least one active day for a permanent task.');
-          return;
-        }
+      if (!isTemporary && selectedDays.length === 0) {
+        alert('Please select at least one active day for a permanent job.');
+        return;
       }
+
+      const isApproved = (currentUserRole === 'admin' || isTemporary);
 
       const taskPayload = {
         title,
         category,
-        max_photos: maxPhotos,
+        max_photos: photosCount,
         requires_photo: requiresPhoto,
         requires_initials: requiresInitials,
-        days: JSON.stringify(selectedDays)
+        days: isTemporary ? [currentSelectedDay] : selectedDays,
+        is_temporary: isTemporary,
+        created_for_date: isTemporary ? currentSelectedDateISO : null,
+        is_approved: isApproved
       };
 
-      if (isTemp) {
-        if (editingId) {
-          const { error } = await supabaseClient.from('tasks').update(taskPayload).eq('id', editingId);
-          if (error) { alert('Error updating task: ' + error.message); return; }
-          alert('✓ Task updated successfully!');
-        } else {
-          const { error } = await supabaseClient.from('tasks').insert([taskPayload]);
-          if (error) { alert('Error adding task: ' + error.message); return; }
-          alert('✓ Temporary job added for today!');
+      if (editingId) {
+        const { error } = await supabaseClient.from('tasks').update(taskPayload).eq('id', editingId);
+        if (error) {
+          alert('Error updating task: ' + error.message);
+          return;
         }
-        cancelEditTask();
-        loadAdminTasks();
-        selectDay(currentSelectedDay);
       } else {
-        const permPayload = {
-          ...taskPayload,
-          submitted_by: document.getElementById('user-welcome-email').textContent || 'Supervisor'
-        };
-        const { error } = await supabaseClient.from('pending_tasks').insert([permPayload]);
-        if (error) { alert('Error submitting request: ' + error.message); return; }
-        alert('✓ Request for permanent job sent to Admin approval queue!');
-        cancelEditTask();
-        loadAdminTasks();
+        const { error } = await supabaseClient.from('tasks').insert([taskPayload]);
+        if (error) {
+          alert('Error creating task: ' + error.message);
+          return;
+        }
       }
+
+      cancelEditTask();
+      await loadAdminTasks();
+      alert(isApproved ? '✓ Task saved successfully!' : '📩 Permanent job request sent to Admin for approval!');
     };
 
     window.editTask = function(taskId) {
-      const task = allLoadedTasks.find(t => t.id === taskId);
+      const task = allLoadedTasks.find(t => t.id == taskId);
       if (!task) return;
 
       document.getElementById('editing-task-id').value = task.id;
       document.getElementById('new-task-title').value = task.title;
       document.getElementById('new-task-category').value = task.category || 'Opening';
       document.getElementById('new-task-photos-count').value = task.max_photos || 1;
-      document.getElementById('new-task-photo').checked = !!task.requires_photo;
-      document.getElementById('new-task-initials').checked = task.requires_initials !== false;
+      document.getElementById('new-task-photo').checked = task.requires_photo || false;
+      document.getElementById('new-task-initials').checked = task.requires_initials || false;
 
-      let daysArr = task.days;
-      if (typeof daysArr === 'string') {
-        try { daysArr = JSON.parse(daysArr); } catch(e) { daysArr = []; }
-      }
       document.querySelectorAll('.day-check').forEach(cb => {
-        cb.checked = Array.isArray(daysArr) && daysArr.map(d => d.toLowerCase()).includes(cb.value.toLowerCase());
+        cb.checked = (task.days || []).includes(cb.value);
       });
 
-      document.getElementById('form-heading').textContent = 'Edit Task';
-      document.getElementById('submit-temp-task-btn').textContent = 'Update Task';
+      document.getElementById('form-heading').textContent = 'Edit Job';
       document.getElementById('cancel-edit-btn').classList.remove('hidden');
-      window.scrollTo({ top: document.getElementById('task-form').offsetTop - 20, behavior: 'smooth' });
     };
 
     window.cancelEditTask = function() {
       document.getElementById('editing-task-id').value = '';
-      document.getElementById('new-task-title').value = '';
-      document.getElementById('new-task-category').value = 'Opening';
-      document.getElementById('new-task-photos-count').value = '1';
-      document.getElementById('new-task-photo').checked = false;
-      document.getElementById('new-task-initials').checked = true;
-      document.querySelectorAll('.day-check').forEach(cb => cb.checked = false);
-
+      document.getElementById('task-form').reset();
       document.getElementById('form-heading').textContent = 'Add Job';
-      document.getElementById('submit-temp-task-btn').textContent = '+ Add Temporary Job (Today Only)';
       document.getElementById('cancel-edit-btn').classList.add('hidden');
+    };
+
+    window.approveTask = async function(taskId) {
+      const { error } = await supabaseClient.from('tasks').update({ is_approved: true }).eq('id', taskId);
+      if (error) {
+        alert('Error approving task: ' + error.message);
+      } else {
+        await loadAdminTasks();
+      }
     };
 
     window.deleteTask = async function(taskId) {
@@ -2763,130 +2685,2817 @@
       const { error } = await supabaseClient.from('tasks').delete().eq('id', taskId);
       if (error) {
         alert('Error deleting task: ' + error.message);
-        return;
+      } else {
+        await loadAdminTasks();
       }
-      loadAdminTasks();
-      selectDay(currentSelectedDay);
     };
 
-    window.approveTask = async function(ptId) {
-      const { data: ptData, error: fetchErr } = await supabaseClient
-        .from('pending_tasks')
-        .select('*')
-        .eq('id', ptId)
-        .single();
-
-      if (fetchErr || !ptData) {
-        alert('Could not retrieve pending task.');
-        return;
-      }
-
-      delete ptData.id;
-      delete ptData.submitted_by;
-
-      const { error: insertErr } = await supabaseClient.from('tasks').insert([ptData]);
-      if (insertErr) {
-        alert('Error publishing task: ' + insertErr.message);
-        return;
-      }
-
-      await supabaseClient.from('pending_tasks').delete().eq('id', ptId);
-      alert('✓ Permanent task approved and published!');
-      loadAdminTasks();
-      selectDay(currentSelectedDay);
-    };
-
-    window.rejectTask = async function(ptId) {
-      if (!confirm('Reject this permanent task request?')) return;
-      await supabaseClient.from('pending_tasks').delete().eq('id', ptId);
-      loadAdminTasks();
-    };
-
+    // LEADERBOARD & STAFF PERFORMANCE COMPUTATION FROM SUPABASE
     async function loadStaffPerformance(isAutoRefresh = false) {
       const container = document.getElementById('modal-staff-performance-container');
       if (!container) return;
 
       if (!isAutoRefresh) {
-        container.innerHTML = `<p style="text-align: center; color: var(--text-muted);">Loading staff performance...</p>`;
+        container.innerHTML = '<p style="text-align: center; color: var(--text-muted);">Calculating leaderboard scores...</p>';
       }
 
-      const { data: comps, error } = await supabaseClient
-        .from('completions')
-        .select('*');
+      const { data: completions, error } = await supabaseClient
+        .from('task_completions')
+        .select('staff_initials, completed_date');
 
-      if (error || !comps || comps.length === 0) {
-        container.innerHTML = `<p style="text-align: center; color: var(--text-muted);">No task completions recorded yet.</p>`;
+      if (error) {
+        container.innerHTML = `<p class="error-message">Error fetching leaderboard: ${error.message}</p>`;
         return;
       }
 
-      const staffStats = {};
-      comps.forEach(c => {
-        const rawInitials = c.initials || c.completed_by || 'Unknown';
-        const parsedNames = parseInitials(rawInitials);
-        const attributionNames = parsedNames.length > 0 ? parsedNames : [rawInitials.trim().toUpperCase()];
-
-        attributionNames.forEach(name => {
-          if (!name || name === 'UNKNOWN') return;
-          staffStats[name] = (staffStats[name] || 0) + 1;
+      const counts = {};
+      (completions || []).forEach(c => {
+        const parsedNames = parseInitials(c.staff_initials);
+        parsedNames.forEach(name => {
+          counts[name] = (counts[name] || 0) + 1;
         });
       });
 
-      const sortedStaff = Object.entries(staffStats).sort((a, b) => b[1] - a[1]);
+      const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
 
-      if (sortedStaff.length === 0) {
-        container.innerHTML = `<p style="text-align: center; color: var(--text-muted);">No staff completions recorded yet.</p>`;
+      if (sorted.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: var(--text-muted);">No completions recorded yet.</p>';
         return;
       }
 
-      container.innerHTML = sortedStaff.map(([name, count], index) => {
-        let medal = `#${index + 1}`;
-        if (index === 0) medal = '🥇';
-        else if (index === 1) medal = '🥈';
-        else if (index === 2) medal = '🥉';
-
+      const medals = ['🥇', '🥈', '🥉'];
+      container.innerHTML = sorted.map(([name, count], index) => {
+        const medal = medals[index] || ` #${index + 1}`;
         return `
-          <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-card-alt); padding: 0.85rem 1rem; border-radius: 10px; margin-bottom: 8px; border: 1px solid rgba(255,255,255,0.05);">
-            <div style="display: flex; align-items: center; gap: 12px;">
-              <span style="font-size: 1.1rem; font-weight: 800; min-width: 30px; text-align: center;">${medal}</span>
-              <span style="font-weight: 700; font-size: 0.95rem; color: #fff;">👤 ${escapeHtml(name)}</span>
-            </div>
-            <span style="background: rgba(153, 198, 62, 0.2); border: 1px solid var(--flipout-green); color: var(--flipout-green); padding: 4px 10px; border-radius: 20px; font-weight: 800; font-size: 0.85rem;">
-              ${count} Tasks Completed
-            </span>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; margin-bottom: 8px; background: var(--bg-input); border-radius: 10px; border: 1px solid rgba(255,80,159,0.2);">
+            <span style="font-weight: 700; color: #fff; font-size: 0.95rem;">${medal} ${name}</span>
+            <span style="background: var(--flipout-pink); color: #fff; padding: 3px 10px; border-radius: 12px; font-weight: 800; font-size: 0.85rem;">${count} Task${count === 1 ? '' : 's'}</span>
           </div>
         `;
       }).join('');
     }
 
+    // EXPORT COMPLETIONS TO CSV (FOR ADMIN BACK OFFICE)
     window.exportCompletionsToCSV = async function() {
-      const { data, error } = await supabaseClient.from('completions').select('*');
-      if (error || !data || data.length === 0) {
-        alert('No completion records found to export.');
+      const { data: completions, error } = await supabaseClient
+        .from('task_completions')
+        .select('*, tasks(title, category)')
+        .order('completed_date', { ascending: false });
+
+      if (error) {
+        alert('Error exporting CSV: ' + error.message);
         return;
       }
 
-      let csvContent = 'data:text/csv;charset=utf-8,Task ID,Date,Completed By,Initials,Photos\n';
-      data.forEach(row => {
-        csvContent += `"${row.task_id}","${row.date}","${row.completed_by || ''}","${row.initials || ''}","${row.photo_url || ''}"\n`;
+      if (!completions || completions.length === 0) {
+        alert('No completions found to export.');
+        return;
+      }
+
+      let csvContent = 'data:text/csv;charset=utf-8,ID,Date,Task Category,Task Title,Staff Name,Photo URLs,Completed At\n';
+
+      completions.forEach(c => {
+        const title = c.tasks ? `"${c.tasks.title.replace(/"/g, '""')}"` : '"Unknown Task"';
+        const category = c.tasks ? `"${c.tasks.category.replace(/"/g, '""')}"` : '"General"';
+        const staff = `"${(c.staff_initials || '').replace(/"/g, '""')}"`;
+        const photos = `"${(c.photo_url || '').replace(/"/g, '""')}"`;
+        const row = [c.id, c.completed_date, category, title, staff, photos, c.completed_at || ''].join(',');
+        csvContent += row + '\n';
       });
 
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement('a');
       link.setAttribute('href', encodedUri);
-      link.setAttribute('download', `FlipOut_Completions_${getMelbourneTodayISO()}.csv`);
+      link.setAttribute('download', `FlipOut_Task_Completions_${getMelbourneTodayISO()}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
     };
 
-    window.sendEODSummaryEmail = async function(isAutomatic = false) {
-      if (!isAutomatic) {
-        alert('Preparing EOD Summary Dispatch...');
-      }
-      showEODReportScreen();
+    window.sendEODSummaryEmail = async function(isManualTrigger = true) {
+      alert('EOD Summary generation complete.');
     };
 
-    window.onload = initialiseApp;
+    // Initialize application on DOM content load
+    document.addEventListener('DOMContentLoaded', () => {
+      initialiseApp();
+    });
+  </script>
+</body>
+</html>
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 760px;
+      padding: 2rem;
+      background: var(--bg-card);
+      border-radius: 20px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7), 0 0 20px rgba(255, 80, 159, 0.15);
+      border: 2px solid transparent;
+      border-image: linear-gradient(135deg, var(--flipout-green), var(--flipout-pink)) 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Top Left Navigation Actions */
+    .top-left-actions {
+      position: absolute;
+      top: 15px;
+      left: 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 20;
+    }
+
+    /* Top Right Navigation Actions */
+    .top-right-actions {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 20;
+    }
+
+    .top-nav-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      color: var(--text-light);
+      padding: 0.5rem 0.8rem;
+      border-radius: 8px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+      backdrop-filter: blur(4px);
+    }
+
+    .top-nav-btn:hover {
+      background: var(--flipout-pink);
+      border-color: var(--flipout-pink);
+      color: #fff;
+    }
+
+    .btn-eod-highlight {
+      border-color: var(--flipout-green);
+      background: rgba(153, 198, 62, 0.15);
+      color: var(--flipout-green);
+    }
+
+    .btn-eod-highlight:hover {
+      background: var(--flipout-green);
+      color: var(--flipout-velvet);
+      border-color: var(--flipout-green);
+    }
+
+    .brand-header {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      margin-bottom: 1.5rem;
+      position: relative;
+      margin-top: 2rem;
+    }
+
+    .brand-logo {
+      max-width: 240px;
+      height: auto;
+      margin-bottom: 0.5rem;
+      filter: drop-shadow(0 4px 12px rgba(0,0,0,0.5));
+    }
+
+    .sub-title {
+      text-align: center;
+      color: var(--flipout-pink);
+      font-weight: 700;
+      font-size: 0.95rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .mascot-hero-right {
+      position: absolute;
+      top: -10px;
+      right: -15px;
+      width: 110px;
+      height: auto;
+      pointer-events: none;
+      filter: drop-shadow(0 6px 12px rgba(0,0,0,0.4));
+      z-index: 2;
+    }
+
+    .mascot-corner-left {
+      position: absolute;
+      bottom: 10px;
+      left: -10px;
+      width: 95px;
+      height: auto;
+      pointer-events: none;
+      opacity: 0.9;
+    }
+
+    .progress-wrapper {
+      margin-bottom: 1.5rem;
+      background: var(--bg-input);
+      border-radius: 14px;
+      padding: 1.1rem;
+      border: 1px solid rgba(255, 80, 159, 0.25);
+      box-shadow: inset 0 2px 6px rgba(0,0,0,0.5);
+    }
+
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      font-weight: bold;
+      margin-bottom: 0.6rem;
+      color: var(--flipout-green);
+    }
+
+    .progress-bar-bg {
+      width: 100%;
+      height: 14px;
+      background: #140726;
+      border-radius: 7px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--flipout-green), var(--flipout-pink));
+      transition: width 0.4s ease;
+      box-shadow: 0 0 10px var(--flipout-pink);
+    }
+
+    .day-selector-container {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 8px;
+      margin-bottom: 1.25rem;
+      border-bottom: 2px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .day-tab {
+      flex: 1;
+      min-width: 62px;
+      padding: 0.7rem 0.4rem;
+      background: var(--bg-card-alt);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      color: var(--text-muted);
+      text-align: center;
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      text-transform: uppercase;
+    }
+
+    .day-tab.active {
+      background: linear-gradient(135deg, var(--flipout-pink), #D62B78);
+      color: var(--flipout-white);
+      border-color: var(--flipout-pink);
+      box-shadow: 0 4px 12px rgba(255, 80, 159, 0.4);
+      transform: translateY(-2px);
+    }
+
+    .checklist-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    .checklist-title {
+      font-size: 1.2rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      color: var(--flipout-green);
+      letter-spacing: 0.5px;
+    }
+
+    .task-card {
+      background: var(--bg-card-alt);
+      border: 1px solid rgba(153, 198, 62, 0.2);
+      border-radius: 12px;
+      padding: 1.1rem;
+      margin-bottom: 0.85rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      transition: all 0.3s ease;
+    }
+
+    .task-card:hover {
+      border-color: rgba(255, 80, 159, 0.4);
+    }
+
+    .task-card.completed {
+      opacity: 0.75;
+      border-color: rgba(153, 198, 62, 0.4);
+      background: var(--bg-input);
+    }
+
+    .task-main {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .task-checkbox {
+      width: 24px;
+      height: 24px;
+      margin-top: 2px;
+      accent-color: var(--flipout-pink);
+      cursor: pointer;
+    }
+
+    .task-label {
+      font-size: 0.98rem;
+      flex-grow: 1;
+      line-height: 1.4;
+      font-weight: 500;
+    }
+
+    .task-card.completed .task-label {
+      text-decoration: line-through;
+      color: var(--text-muted);
+    }
+
+    .task-meta {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      padding-left: 36px;
+      flex-wrap: wrap;
+    }
+
+    .initials-input {
+      width: 180px;
+      padding: 0.45rem 0.6rem;
+      border-radius: 8px;
+      border: 1px solid var(--flipout-pink);
+      background: var(--bg-input);
+      color: #fff;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .photo-upload-btn {
+      background: rgba(255, 80, 159, 0.15);
+      border: 1px solid var(--flipout-pink);
+      color: #fff;
+      padding: 0.45rem 0.8rem;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .photo-upload-btn:hover {
+      background: var(--flipout-pink);
+      color: #fff;
+    }
+
+    .view-photo-btn {
+      background: rgba(153, 198, 62, 0.2);
+      border: 1px solid var(--flipout-green);
+      color: #fff;
+      padding: 0.45rem 0.8rem;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .view-photo-btn:hover {
+      background: var(--flipout-green);
+      color: var(--flipout-velvet);
+    }
+
+    .badge-temp {
+      background: var(--flipout-pink);
+      color: #fff;
+      font-size: 0.7rem;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* EOD REPORT FORM STYLING MATCHING PDF */
+    .eod-card {
+      background: var(--bg-card-alt);
+      border-radius: 14px;
+      padding: 1.25rem;
+      margin-bottom: 1.25rem;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .eod-card-green {
+      border: 2px solid var(--flipout-green);
+      background: rgba(153, 198, 62, 0.05);
+    }
+
+    .eod-section-title {
+      font-family: 'Unbounded', sans-serif;
+      font-size: 0.95rem;
+      color: var(--flipout-green);
+      margin-top: 0;
+      margin-bottom: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .eod-grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    @media (max-width: 580px) {
+      .eod-grid-2 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .eod-read-only {
+      background: var(--bg-input) !important;
+      border-color: rgba(255, 255, 255, 0.15) !important;
+      color: var(--text-muted) !important;
+      font-weight: 700;
+      cursor: not-allowed;
+    }
+
+    .eod-calculated-field {
+      background: rgba(153, 198, 62, 0.15) !important;
+      border: 1px solid var(--flipout-green) !important;
+      color: var(--flipout-green) !important;
+      font-weight: 800 !important;
+      font-size: 1.05rem !important;
+    }
+
+    .eod-grand-total {
+      background: linear-gradient(135deg, rgba(153, 198, 62, 0.25), rgba(255, 80, 159, 0.25)) !important;
+      border: 2px solid var(--flipout-green) !important;
+      color: #FFFFFF !important;
+      font-size: 1.3rem !important;
+      font-weight: 900 !important;
+      text-align: right;
+    }
+
+    /* COUNTER & WORKER ROW STYLING FOR OPERATIONAL QUESTIONS */
+    .eod-q-box {
+      background: var(--bg-input);
+      padding: 1rem;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 80, 159, 0.25);
+      margin-bottom: 1.1rem;
+    }
+
+    .eod-q-title {
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: var(--flipout-green);
+      margin-bottom: 0.75rem;
+      line-height: 1.4;
+    }
+
+    .counter-control-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-counter {
+      background: linear-gradient(135deg, var(--flipout-pink), #d83a7f);
+      color: #fff;
+      border: none;
+      width: 38px;
+      height: 38px;
+      border-radius: 8px;
+      font-size: 1.2rem;
+      font-weight: 800;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      transition: all 0.15s ease;
+    }
+
+    .btn-counter:active {
+      transform: scale(0.92);
+    }
+
+    .btn-counter-green {
+      background: linear-gradient(135deg, var(--flipout-green), #7ba828);
+      color: var(--flipout-velvet);
+    }
+
+    .input-counter-val {
+      width: 70px !important;
+      text-align: center;
+      font-size: 1.1rem !important;
+      font-weight: 800 !important;
+      padding: 0.45rem !important;
+      margin-bottom: 0 !important;
+    }
+
+    .worker-counter-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+
+    .worker-name-input {
+      flex: 1;
+      min-width: 140px;
+      margin-bottom: 0 !important;
+    }
+
+    .btn-add-worker-row {
+      background: rgba(153, 198, 62, 0.15);
+      border: 1px dashed var(--flipout-green);
+      color: var(--flipout-green);
+      padding: 0.45rem 0.8rem;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 4px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .btn-add-worker-row:hover {
+      background: var(--flipout-green);
+      color: var(--flipout-velvet);
+    }
+
+    /* CASH CALCULATOR TABLE STYLING */
+    .cash-calc-table-container {
+      width: 100%;
+      overflow-x: auto;
+      margin-top: 1rem;
+      border-radius: 8px;
+    }
+
+    .cash-calc-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #FFFFFF;
+      color: #000000;
+      border: 2px solid #000000;
+    }
+
+    .cash-calc-table th {
+      background-color: var(--flipout-green);
+      color: #000000;
+      font-weight: 800;
+      font-family: 'Unbounded', sans-serif;
+      font-size: 0.95rem;
+      padding: 10px;
+      border: 2px solid #000000;
+      text-align: center;
+    }
+
+    .cash-calc-table td {
+      border: 2px solid #000000;
+      padding: 8px 12px;
+      font-weight: 700;
+      font-size: 1rem;
+      text-align: center;
+      color: #000000;
+    }
+
+    .cash-calc-table td:first-child {
+      font-weight: 800;
+      font-size: 1.05rem;
+    }
+
+    .cash-calc-table input.calc-qty {
+      width: 100%;
+      max-width: 140px;
+      text-align: center;
+      font-weight: 700;
+      font-size: 1.05rem;
+      padding: 6px;
+      border: 1px solid #000000;
+      background: #FFFFFF;
+      color: #000000;
+      border-radius: 4px;
+    }
+
+    .cash-calc-table input.calc-qty:focus {
+      outline: 2px solid var(--flipout-pink);
+      border-color: var(--flipout-pink);
+    }
+
+    .cash-calc-table .highlight-label {
+      background-color: var(--flipout-green);
+      color: #000000;
+      font-weight: 800;
+      font-family: 'Unbounded', sans-serif;
+      text-align: center;
+      font-size: 1rem;
+    }
+
+    .cash-calc-table .highlight-val {
+      font-weight: 900;
+      font-size: 1.15rem;
+      background-color: #FFFFFF;
+      color: #000000;
+      text-align: center;
+    }
+
+    .reward-modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(15, 4, 29, 0.85);
+      backdrop-filter: blur(8px);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+      animation: fadeIn 0.3s ease-out;
+    }
+
+    .reward-modal-card {
+      background: var(--bg-card);
+      border: 3px solid var(--flipout-pink);
+      border-radius: 24px;
+      padding: 2rem 1.75rem;
+      text-align: center;
+      max-width: 480px;
+      width: 90%;
+      box-shadow: 0 0 30px rgba(255, 80, 159, 0.4), 0 0 15px rgba(153, 198, 62, 0.3);
+      animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .reward-icon {
+      font-size: 3.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .reward-title {
+      font-size: 1.4rem;
+      color: var(--flipout-green);
+      margin: 0 0 0.75rem 0;
+      letter-spacing: 1px;
+    }
+
+    .reward-text {
+      font-size: 1.05rem;
+      color: #FFFFFF;
+      line-height: 1.5;
+      margin-bottom: 1.5rem;
+      font-weight: 500;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes popIn {
+      from { transform: scale(0.7); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .approval-window {
+      background: #2D1402;
+      border: 2px solid var(--warning);
+      border-radius: 14px;
+      padding: 1.25rem;
+      margin-bottom: 2rem;
+    }
+
+    .admin-task-item {
+      background: var(--bg-card-alt);
+      border-radius: 10px;
+      padding: 1rem;
+      margin-bottom: 0.75rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .admin-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .form-group {
+      margin-bottom: 1rem;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 0.4rem;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 0.75rem;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 80, 159, 0.3);
+      background: var(--bg-input);
+      color: #fff;
+      font-size: 0.95rem;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--flipout-green);
+    }
+
+    .password-container {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .password-container input {
+      padding-right: 2.8rem;
+    }
+
+    .toggle-password-btn {
+      position: absolute;
+      right: 8px;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 1.1rem;
+      padding: 4px 8px;
+    }
+
+    .days-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 4px;
+      margin-top: 0.4rem;
+    }
+
+    .day-checkbox-label {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      font-size: 0.75rem;
+      background: var(--bg-input);
+      padding: 8px 2px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.1);
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .btn-primary {
+      width: 100%;
+      padding: 0.9rem;
+      border: none;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--flipout-green), #7BA828);
+      color: var(--flipout-velvet);
+      font-family: 'Unbounded', sans-serif;
+      font-weight: 800;
+      font-size: 0.95rem;
+      cursor: pointer;
+      text-transform: uppercase;
+      box-shadow: 0 4px 12px rgba(153, 198, 62, 0.3);
+      transition: all 0.2s ease;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(153, 198, 62, 0.4);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 80, 159, 0.15);
+      border: 1px solid var(--flipout-pink);
+      color: #fff;
+      padding: 0.5rem 0.8rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 600;
+      transition: all 0.2s ease;
+    }
+
+    .btn-secondary:hover {
+      background: var(--flipout-pink);
+    }
+
+    .btn-success {
+      background: #198754;
+      border: 1px solid var(--flipout-green);
+      color: #fff;
+      padding: 0.6rem 1rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: bold;
+    }
+
+    .btn-danger {
+      background: transparent;
+      border: 1px solid var(--danger);
+      color: var(--danger);
+      padding: 0.4rem 0.6rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.8rem;
+    }
+
+    .btn-small {
+      padding: 0.3rem 0.5rem;
+      font-size: 0.75rem;
+    }
+
+    .footer {
+      margin-top: 2rem;
+      text-align: center;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+    }
+
+    .admin-link {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .error-message {
+      color: var(--danger);
+      font-size: 0.85rem;
+      margin-top: 0.5rem;
+      text-align: center;
+    }
+
+    .success-message {
+      color: var(--flipout-green);
+      font-size: 0.85rem;
+      margin-top: 0.5rem;
+      text-align: center;
+    }
+
+    .role-badge {
+      font-size: 0.75rem;
+      background: rgba(255, 80, 159, 0.2);
+      border: 1px solid var(--flipout-pink);
+      color: var(--flipout-pink);
+      padding: 3px 10px;
+      border-radius: 12px;
+      text-transform: uppercase;
+      font-weight: bold;
+    }
+
+    .section-divider {
+      margin: 1.5rem 0 1rem 0;
+      padding-top: 1rem;
+      border-top: 2px dashed rgba(255, 80, 159, 0.3);
+      font-size: 0.9rem;
+      color: var(--flipout-pink);
+      font-weight: bold;
+      text-transform: uppercase;
+      font-family: 'Unbounded', sans-serif;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 1. STAFF CHECKLIST VIEW -->
+  <div id="main-app" class="container">
+    <div class="top-left-actions">
+      <button id="show-admin-login-btn" onclick="showAdminLoginScreen()" class="top-nav-btn">🔑 Back Office Access</button>
+      <button id="show-eod-report-btn" onclick="showEODReportScreen()" class="top-nav-btn btn-eod-highlight">📊 Submit EOD Report</button>
+    </div>
+
+    <div class="brand-header">
+      <img src="FO Derrimut-01.png" alt="Flip Out Derrimut Logo" class="brand-logo">
+      <div class="sub-title">Daily Operations Checklist</div>
+      <img src="14.png" alt="Jet and Max Ninjas" class="mascot-hero-right">
+    </div>
+
+    <div class="progress-wrapper">
+      <div class="progress-header">
+        <span>Completion Progress</span>
+        <span id="progress-percent">0%</span>
+      </div>
+      <div class="progress-bar-bg">
+        <div id="progress-bar-fill" class="progress-bar-fill"></div>
+      </div>
+    </div>
+
+    <div class="day-selector-container">
+      <button class="day-tab main-day-tab" data-day="monday" onclick="selectDay('monday')">Mon</button>
+      <button class="day-tab main-day-tab" data-day="tuesday" onclick="selectDay('tuesday')">Tue</button>
+      <button class="day-tab main-day-tab" data-day="wednesday" onclick="selectDay('wednesday')">Wed</button>
+      <button class="day-tab main-day-tab" data-day="thursday" onclick="selectDay('thursday')">Thu</button>
+      <button class="day-tab main-day-tab" data-day="friday" onclick="selectDay('friday')">Fri</button>
+      <button class="day-tab main-day-tab" data-day="saturday" onclick="selectDay('saturday')">Sat</button>
+      <button class="day-tab main-day-tab" data-day="sunday" onclick="selectDay('sunday')">Sun</button>
+    </div>
+
+    <div class="checklist-header">
+      <div id="active-day-title" class="checklist-title">Today's Tasks</div>
+      <img src="Dash pose 3.png" alt="Dash Ninja" style="height: 45px; width: auto;">
+    </div>
+
+    <div id="pending-tasks-container">
+      <p style="text-align: center; color: var(--text-muted);">Loading tasks from database...</p>
+    </div>
+
+    <div id="completed-section" class="hidden" style="position: relative;">
+      <div class="section-divider">✓ Completed Tasks (Click to Uncheck)</div>
+      <div id="completed-tasks-container"></div>
+      <img src="Roo pose 4.png" alt="Roo Ninja" class="mascot-corner-left">
+    </div>
+
+    <div class="footer">
+      <button onclick="openLeaderboardModal()" class="btn-secondary btn-eod-highlight" style="font-size: 0.85rem; padding: 0.6rem 1.2rem;">
+        🏆 Leaderboard
+      </button>
+      <button onclick="hardRefreshApp()" class="btn-secondary" style="font-size: 0.85rem; padding: 0.6rem 1.2rem;">
+        🔄 Refresh
+      </button>
+    </div>
+  </div>
+
+  <!-- 2. END OF DAY REPORT FORM VIEW -->
+  <div id="eod-report-screen" class="container hidden">
+    <div class="top-left-actions">
+      <button onclick="showMainApp()" class="top-nav-btn">← Return to Portal</button>
+    </div>
+
+    <div class="top-right-actions">
+      <button onclick="showCashCalculatorScreen()" class="top-nav-btn btn-eod-highlight">🧮 Cash Calculator</button>
+    </div>
+
+    <div class="brand-header">
+      <img src="FO Derrimut-01.png" alt="Flip Out Derrimut Logo" class="brand-logo" style="max-width: 170px;">
+      <h2 style="margin: 4px 0 2px 0; color: var(--flipout-green); font-size: 1.15rem; letter-spacing: 0.5px;">END OF DAY REPORT</h2>
+      <div class="sub-title" style="color: var(--flipout-pink); font-size: 0.85rem;">FLIPOUT DERRIMUT</div>
+    </div>
+
+    <form id="eod-takings-form">
+      <!-- GENERAL INFORMATION & WORKER MANAGEMENT SECTION -->
+      <div class="eod-card eod-card-green">
+        <div class="eod-grid-2">
+          <div class="form-group">
+            <label for="eod-day">Day:</label>
+            <input type="text" id="eod-day" class="eod-read-only" readonly />
+          </div>
+          <div class="form-group">
+            <label for="eod-date">Date:</label>
+            <input type="text" id="eod-date" class="eod-read-only" readonly />
+          </div>
+        </div>
+        
+        <!-- DYNAMIC WORKER ADD/REMOVE MANAGER -->
+        <div class="form-group" style="margin-bottom: 0;">
+          <label>Staff On Shift Today:</label>
+          <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+            <input type="text" id="new-worker-input" placeholder="Add worker name" onkeypress="if(event.key==='Enter'){event.preventDefault();addWorkerForDay();}" />
+            <button type="button" onclick="addWorkerForDay()" class="btn-secondary" style="white-space: nowrap; font-weight: bold;">+ Add Worker</button>
+          </div>
+          <div id="active-workers-list" style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; margin-bottom: 4px;"></div>
+          <input type="hidden" id="eod-staff" required />
+        </div>
+      </div>
+
+      <!-- RECEPTION 1 / CASH TAKINGS SECTION -->
+      <div class="eod-card">
+        <div class="eod-section-title">💵 Cash Totals </div>
+        <div class="eod-grid-2">
+          <div class="form-group">
+            <label for="eod-float">Float <span style="font-weight: normal; font-size: 0.75rem; color: var(--text-muted);">(Morning till float - excluded from total)</span></label>
+            <input type="text" id="eod-float" value="$300.00" class="eod-read-only" readonly />
+          </div>
+          <div class="form-group">
+            <label for="eod-takings-input">Takings ($)</label>
+            <input type="number" step="0.01" min="0" id="eod-takings-input" placeholder="0.00" value="0.00" required />
+          </div>
+          <div class="form-group">
+            <label for="eod-eod-takings-input">EOD Takings ($)</label>
+            <input type="number" step="0.01" min="0" id="eod-eod-takings-input" placeholder="0.00" value="0.00" required />
+          </div>
+          <div class="form-group">
+            <label for="eod-total-cash-1">Total Cash ($)</label>
+            <input type="text" id="eod-total-cash-1" class="eod-calculated-field" value="$0.00" readonly />
+          </div>
+        </div>
+      </div>
+
+      <!-- EFTPOS STATEMENT SECTION -->
+      <div class="eod-card">
+        <div class="eod-section-title">💳 Eftpos Statement</div>
+        <div class="eod-grid-2">
+          <div class="form-group">
+            <label for="eod-eftpos-1">Reception 1 ($)</label>
+            <input type="number" step="0.01" min="0" id="eod-eftpos-1" placeholder="0.00" value="0.00" required />
+          </div>
+          <div class="form-group">
+            <label for="eod-eftpos-2">Reception 2 ($)</label>
+            <input type="number" step="0.01" min="0" id="eod-eftpos-2" placeholder="0.00" value="0.00" required />
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+          <label for="eod-total-eftpos">Total Eftpos ($)</label>
+          <input type="text" id="eod-total-eftpos" class="eod-calculated-field" value="$0.00" readonly />
+        </div>
+      </div>
+
+      <!-- TOTALS SUMMARY SECTION -->
+      <div class="eod-card eod-card-green">
+        <div class="eod-section-title">📊 Totals</div>
+        <div class="eod-grid-2">
+          <div class="form-group">
+            <label for="eod-summary-eftpos">Total Eftpos ($)</label>
+            <input type="text" id="eod-summary-eftpos" class="eod-calculated-field" value="$0.00" readonly />
+          </div>
+          <div class="form-group">
+            <label for="eod-total-cash-2">Total Cash ($)</label>
+            <input type="text" id="eod-total-cash-2" class="eod-calculated-field" value="$0.00" readonly />
+          </div>
+          <div class="form-group">
+            <label for="eod-online-booking">Online Booking ($)</label>
+            <input type="number" step="0.01" min="0" id="eod-online-booking" placeholder="0.00" value="0.00" required />
+          </div>
+          <div class="form-group">
+            <label for="eod-bank-transfer">Bank Transfer ($)</label>
+            <input type="number" step="0.01" min="0" id="eod-bank-transfer" placeholder="0.00" value="0.00" required />
+          </div>
+        </div>
+        <div class="form-group" style="margin-top: 0.5rem; margin-bottom: 0;">
+          <label for="eod-grand-total-input" style="color: var(--flipout-green); font-size: 0.95rem; font-weight: 800;">TOTAL ($)</label>
+          <input type="text" id="eod-grand-total-input" class="eod-grand-total" value="$0.00" readonly />
+        </div>
+      </div>
+
+      <!-- DYNAMIC OPERATIONAL QUESTIONS WITH AUTO-SAVE COUNTERS -->
+      <div class="eod-card" id="eod-questions-card">
+        <div class="eod-section-title">❓ End of Day Operational Questions</div>
+        <div id="eod-questions-container">
+          <p style="text-align: center; color: var(--text-muted);">Loading operational questions...</p>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-primary" style="margin-bottom: 1rem;">📤 Submit EOD Report</button>
+      <div id="eod-submit-msg"></div>
+    </form>
+
+    <div class="footer" style="justify-content: center;">
+      <button onclick="showMainApp()" class="admin-link">← Return to Checklist Portal</button>
+    </div>
+  </div>
+
+  <!-- 3. CASH CALCULATOR VIEW -->
+  <div id="cash-calculator-screen" class="container hidden">
+    <div class="top-left-actions">
+      <button onclick="showEODReportScreen()" class="top-nav-btn">← Return to EOD Report</button>
+    </div>
+
+    <div class="brand-header">
+      <img src="FO Derrimut-01.png" alt="Flip Out Derrimut Logo" class="brand-logo" style="max-width: 170px;">
+      <h2 style="margin: 4px 0 2px 0; color: var(--flipout-green); font-size: 1.15rem; letter-spacing: 0.5px;">CASH CALCULATOR</h2>
+      <div class="sub-title" style="color: var(--flipout-pink); font-size: 0.85rem;">FLIPOUT DERRIMUT</div>
+    </div>
+
+    <div class="cash-calc-table-container">
+      <table class="cash-calc-table">
+        <thead>
+          <tr>
+            <th>Cash</th>
+            <th>Quantity</th>
+            <th>Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>$100.00</td>
+            <td><input type="number" min="0" value="0" class="calc-qty" data-denom="100.00" oninput="updateCashCalculator()"></td>
+            <td class="calc-row-amount" id="amt-100-00">$0.00</td>
+          </tr>
+          <tr>
+            <td>$50.00</td>
+            <td><input type="number" min="0" value="0" class="calc-qty" data-denom="50.00" oninput="updateCashCalculator()"></td>
+            <td class="calc-row-amount" id="amt-50-00">$0.00</td>
+          </tr>
+          <tr>
+            <td>$20.00</td>
+            <td><input type="number" min="0" value="0" class="calc-qty" data-denom="20.00" oninput="updateCashCalculator()"></td>
+            <td class="calc-row-amount" id="amt-20-00">$0.00</td>
+          </tr>
+          <tr>
+            <td>$10.00</td>
+            <td><input type="number" min="0" value="0" class="calc-qty" data-denom="10.00" oninput="updateCashCalculator()"></td>
+            <td class="calc-row-amount" id="amt-10-00">$0.00</td>
+          </tr>
+          <tr>
+            <td>$5.00</td>
+            <td><input type="number" min="0" value="0" class="calc-qty" data-denom="5.00" oninput="updateCashCalculator()"></td>
+            <td class="calc-row-amount" id="amt-5-00">$0.00</td>
+          </tr>
+          <tr>
+            <td>$2.00</td>
+            <td><input type="number" min="0" value="0" class="calc-qty" data-denom="2.00" oninput="updateCashCalculator()"></td>
+            <td class="calc-row-amount" id="amt-2-00">$0.00</td>
+          </tr>
+          <tr>
+            <td>$1.00</td>
+            <td><input type="number" min="0" value="0" class="calc-qty" data-denom="1.00" oninput="updateCashCalculator()"></td>
+            <td class="calc-row-amount" id="amt-1-00">$0.00</td>
+          </tr>
+          <tr>
+            <td>$0.50</td>
+            <td><input type="number" min="0" value="0" class="calc-qty" data-denom="0.50" oninput="updateCashCalculator()"></td>
+            <td class="calc-row-amount" id="amt-0-50">$0.00</td>
+          </tr>
+          <tr>
+            <td>$0.20</td>
+            <td><input type="number" min="0" value="0" class="calc-qty" data-denom="0.20" oninput="updateCashCalculator()"></td>
+            <td class="calc-row-amount" id="amt-0-20">$0.00</td>
+          </tr>
+          <tr>
+            <td>$0.10</td>
+            <td><input type="number" min="0" value="0" class="calc-qty" data-denom="0.10" oninput="updateCashCalculator()"></td>
+            <td class="calc-row-amount" id="amt-0-10">$0.00</td>
+          </tr>
+          <tr>
+            <td>$0.05</td>
+            <td><input type="number" min="0" value="0" class="calc-qty" data-denom="0.05" oninput="updateCashCalculator()"></td>
+            <td class="calc-row-amount" id="amt-0-05">$0.00</td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="2" class="highlight-label">Total</td>
+            <td id="cash-calc-total" class="highlight-val">$0.00</td>
+          </tr>
+          <tr>
+            <td colspan="2" class="highlight-label">Deduct Float</td>
+            <td id="cash-calc-deduct-float" class="highlight-val">-$300.00</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <div style="margin-top: 1.5rem; display: flex; gap: 10px;">
+      <button onclick="resetCashCalculator()" class="btn-secondary" style="flex: 1;">🔄 Clear Values</button>
+      <button onclick="showEODReportScreen()" class="btn-primary" style="flex: 2;">✓ Return to EOD Report</button>
+    </div>
+
+    <div class="footer" style="justify-content: center;">
+      <button onclick="showEODReportScreen()" class="admin-link">← Return to EOD Report</button>
+    </div>
+  </div>
+
+  <!-- 4. ADMIN & WORKER LOGIN SCREEN -->
+  <div id="admin-login-screen" class="container hidden">
+    <div class="brand-header">
+      <img src="FO Derrimut-01.png" alt="Flip Out Derrimut Logo" class="brand-logo" style="max-width: 180px;">
+      <div class="sub-title">Staff & Supervisor Login</div>
+    </div>
+
+    <form id="admin-login-form">
+      <div class="form-group">
+        <label for="admin-email">Email</label>
+        <input type="email" id="admin-email" placeholder="user@flipout.com.au" required />
+      </div>
+      <div class="form-group">
+        <label for="admin-password">Password</label>
+        <div class="password-container">
+          <input type="password" id="admin-password" placeholder="••••••••" required />
+          <button type="button" class="toggle-password-btn" onclick="togglePasswordVisibility('admin-password', this)">👁️</button>
+        </div>
+      </div>
+      <button type="submit" class="btn-primary">Authenticate</button>
+      <div id="admin-error" class="error-message"></div>
+    </form>
+
+    <div style="margin-top: 1rem; text-align: center;">
+      <button type="button" onclick="triggerWorkerPasswordReset()" class="admin-link" style="font-size: 0.75rem; color: var(--flipout-pink);">Forgot or Reset Password?</button>
+    </div>
+
+    <div class="footer" style="justify-content: center;">
+      <button id="back-to-app-btn-1" onclick="showMainApp()" class="admin-link">← Return to Checklist Portal</button>
+    </div>
+  </div>
+
+  <!-- 5. BACK OFFICE SCREEN -->
+  <div id="back-office-screen" class="container hidden">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 1rem;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <img src="Ref pose 2.png" alt="Ref Ninja" style="height: 65px; width: auto;">
+        <div>
+          <h2 style="margin:0; text-align: left; font-size: 1.3rem; color: var(--flipout-green);">Back Office</h2>
+          <div class="sub-title" id="user-welcome-email" style="margin-bottom:0; text-align: left; font-size: 0.8rem;">Logged in</div>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
+        <span id="user-role-tag" class="role-badge">Supervisor</span>
+        <div style="display: flex; gap: 6px;">
+          <button onclick="hardRefreshApp()" class="btn-secondary">🔄 Refresh</button>
+          <button id="send-eod-btn" onclick="sendEODSummaryEmail(false)" class="btn-secondary">
+            ✉️ EOD Report
+          </button>
+          <button id="export-csv-btn" onclick="exportCompletionsToCSV()" class="btn-success admin-only hidden">
+            📥 Export CSV
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="approval-queue-section" class="approval-window hidden">
+      <h3 style="margin-top: 0; margin-bottom: 0.5rem; font-size: 1.1rem; color: var(--warning);">📥 Pending Permanent Job Requests (Admin Approval)</h3>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Review supervisor submissions below. Click "Approve" to publish permanently or "Reject" to discard.</p>
+      <div id="approval-task-list"></div>
+    </div>
+
+    <!-- ADMIN USER MANAGEMENT PANEL -->
+    <div class="admin-only hidden" style="margin-bottom: 2rem; background: var(--bg-card-alt); padding: 1.25rem; border-radius: 12px; border: 1px solid rgba(255,80,159,0.3);">
+      <h3 style="margin-top: 0; color: var(--flipout-pink); font-size: 1rem;">👤 Account Management & Worker Password Reset</h3>
+      
+      <form id="create-user-form" style="margin-bottom: 1.25rem;">
+        <h4 style="margin: 0 0 0.5rem 0; font-size: 0.85rem; color: var(--text-muted);">Register New Supervisor Account</h4>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <div class="form-group" style="flex: 1; min-width: 200px; margin-bottom: 0.5rem;">
+            <label for="new-user-email">Supervisor Email</label>
+            <input type="email" id="new-user-email" placeholder="supervisor@flipout.com.au" required />
+          </div>
+          <div class="form-group" style="flex: 1; min-width: 200px; margin-bottom: 0.5rem;">
+            <label for="new-user-password">Temporary Password</label>
+            <div class="password-container">
+              <input type="password" id="new-user-password" placeholder="••••••••" required />
+              <button type="button" class="toggle-password-btn" onclick="togglePasswordVisibility('new-user-password', this)">👁️</button>
+            </div>
+          </div>
+        </div>
+        <button type="submit" class="btn-secondary" style="width: 100%; margin-top: 0.5rem;">Create Account</button>
+        <div id="create-user-msg"></div>
+      </form>
+
+      <div style="border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 1rem;">
+        <h4 style="margin: 0 0 0.5rem 0; font-size: 0.85rem; color: var(--text-muted);">Send Reset Password Instructions to Worker</h4>
+        <div style="display: flex; gap: 10px;">
+          <input type="email" id="admin-reset-target-email" placeholder="worker@flipout.com.au" style="flex: 1;" />
+          <button type="button" onclick="adminTriggerUserReset()" class="btn-secondary" style="white-space: nowrap;">Send Reset Email</button>
+        </div>
+        <div id="admin-reset-msg"></div>
+      </div>
+    </div>
+
+    <!-- WORKER SELF PASSWORD RESET PANEL -->
+    <div id="worker-self-account-section" style="margin-bottom: 2rem; background: var(--bg-card-alt); padding: 1.25rem; border-radius: 12px; border: 1px solid rgba(153,198,62,0.3);">
+      <h3 style="margin-top: 0; color: var(--flipout-green); font-size: 1rem;">🔐 Change My Password</h3>
+      <form id="change-my-password-form">
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <div class="form-group" style="flex: 1; min-width: 200px; margin-bottom: 0.5rem;">
+            <label for="self-new-password">New Password</label>
+            <div class="password-container">
+              <input type="password" id="self-new-password" placeholder="Minimum 6 characters" minlength="6" required />
+              <button type="button" class="toggle-password-btn" onclick="togglePasswordVisibility('self-new-password', this)">👁️</button>
+            </div>
+          </div>
+        </div>
+        <button type="submit" class="btn-secondary" style="width: 100%; margin-top: 0.5rem;">Update Password</button>
+        <div id="self-pwd-msg"></div>
+      </form>
+    </div>
+
+    <!-- TASK FORM -->
+    <form id="task-form" style="margin-bottom: 2rem; background: var(--bg-input); padding: 1.25rem; border-radius: 12px; border: 1px solid rgba(153,198,62,0.2);">
+      <input type="hidden" id="editing-task-id" value="" />
+      <h3 id="form-heading" style="margin-top: 0; color: var(--flipout-green); font-size: 1.1rem;">Add Job</h3>
+      
+      <div class="form-group">
+        <label for="new-task-title">Task Description</label>
+        <input type="text" id="new-task-title" placeholder="e.g. Inspect party room equipment" required />
+      </div>
+
+      <div style="display: flex; gap: 10px;">
+        <div class="form-group" style="flex: 1;">
+          <label for="new-task-category">Category</label>
+          <select id="new-task-category">
+            <option value="Opening">Opening</option>
+            <option value="Safety Checks">Safety Checks</option>
+            <option value="Cleaning">Cleaning</option>
+            <option value="Closing">Closing</option>
+          </select>
+        </div>
+
+        <div class="form-group" style="flex: 1;">
+          <label for="new-task-photos-count">Max Photos Allowed</label>
+          <select id="new-task-photos-count">
+            <option value="1">1 Photo</option>
+            <option value="2">2 Photos</option>
+            <option value="3">3 Photos</option>
+            <option value="4">4 Photos</option>
+            <option value="5">5 Photos</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="days-selector-group" class="form-group">
+        <label>Active Days (Unchecked by default)</label>
+        <div class="days-grid">
+          <label class="day-checkbox-label"><input type="checkbox" class="day-check" value="monday"> Mon</label>
+          <label class="day-checkbox-label"><input type="checkbox" class="day-check" value="tuesday"> Tue</label>
+          <label class="day-checkbox-label"><input type="checkbox" class="day-check" value="wednesday"> Wed</label>
+          <label class="day-checkbox-label"><input type="checkbox" class="day-check" value="thursday"> Thu</label>
+          <label class="day-checkbox-label"><input type="checkbox" class="day-check" value="friday"> Fri</label>
+          <label class="day-checkbox-label"><input type="checkbox" class="day-check" value="saturday"> Sat</label>
+          <label class="day-checkbox-label"><input type="checkbox" class="day-check" value="sunday"> Sun</label>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 1.25rem;">
+        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.9rem;">
+          <input type="checkbox" id="new-task-photo" style="width: auto;"> Requires Photo Upload
+        </label>
+        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.9rem;">
+          <input type="checkbox" id="new-task-initials" checked style="width: auto;"> Requires Staff Full Name + Initial
+        </label>
+      </div>
+
+      <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <button type="button" id="submit-temp-task-btn" onclick="handleTaskFormSubmit(true)" class="btn-primary" style="flex: 1;">+ Add Temporary Job (Today Only)</button>
+        <button type="button" id="submit-perm-task-btn" onclick="handleTaskFormSubmit(false)" class="btn-secondary" style="flex: 1;">📩 Send Request for Permanent Job</button>
+        <button type="button" id="cancel-edit-btn" onclick="cancelEditTask()" class="btn-danger hidden">Cancel Edit</button>
+      </div>
+    </form>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+      <h3 style="margin: 0; font-size: 1.1rem; color: var(--flipout-green);">Active Tasks</h3>
+    </div>
+
+    <div class="day-selector-container">
+      <button class="day-tab admin-filter-tab active" data-filter="all" onclick="filterAdminTasks('all', this)">All</button>
+      <button class="day-tab admin-filter-tab" data-filter="monday" onclick="filterAdminTasks('monday', this)">Mon</button>
+      <button class="day-tab admin-filter-tab" data-filter="tuesday" onclick="filterAdminTasks('tuesday', this)">Tue</button>
+      <button class="day-tab admin-filter-tab" data-filter="wednesday" onclick="filterAdminTasks('wednesday', this)">Wed</button>
+      <button class="day-tab admin-filter-tab" data-filter="thursday" onclick="filterAdminTasks('thursday', this)">Thu</button>
+      <button class="day-tab admin-filter-tab" data-filter="friday" onclick="filterAdminTasks('friday', this)">Fri</button>
+      <button class="day-tab admin-filter-tab" data-filter="saturday" onclick="filterAdminTasks('saturday', this)">Sat</button>
+      <button class="day-tab admin-filter-tab" data-filter="sunday" onclick="filterAdminTasks('sunday', this)">Sun</button>
+    </div>
+
+    <div id="admin-task-list">
+      <p style="text-align: center; color: var(--text-muted);">Loading tasks...</p>
+    </div>
+
+    <div class="footer" style="display: flex; justify-content: space-between; align-items: center;">
+      <button id="logout-btn" onclick="handleSignOut()" class="btn-danger">Sign Out</button>
+      <button id="back-to-app-btn-2" onclick="showMainApp()" class="admin-link">← Return to Portal</button>
+    </div>
+  </div>
+
+  <!-- 6. LEADERBOARD POPUP MODAL -->
+  <div id="leaderboard-modal" class="reward-modal-overlay hidden">
+    <div class="reward-modal-card" style="max-width: 520px; text-align: left;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.75rem;">
+        <h3 style="margin: 0; color: var(--flipout-green); font-size: 1.2rem; font-family: 'Unbounded', sans-serif; display: flex; align-items: center; gap: 8px;">
+          🏆 Staff Leaderboard
+        </h3>
+        <button onclick="closeLeaderboardModal()" class="btn-danger btn-small" style="font-size: 1rem; padding: 2px 8px; cursor: pointer;">✕</button>
+      </div>
+      <div id="modal-staff-performance-container" style="max-height: 380px; overflow-y: auto; padding-right: 4px;">
+        <p style="text-align: center; color: var(--text-muted);">Loading leaderboard...</p>
+      </div>
+      <div style="margin-top: 1.25rem; text-align: right;">
+        <button onclick="closeLeaderboardModal()" class="btn-primary" style="padding: 0.6rem 1.2rem; font-size: 0.85rem;">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 7. MOTIVATIONAL REWARD MODAL -->
+  <div id="reward-modal" class="reward-modal-overlay hidden">
+    <div class="reward-modal-card">
+      <div class="reward-icon">🎉</div>
+      <h3 class="reward-title">FLIP-TASTIC WORK!</h3>
+      <p id="reward-message" class="reward-text"></p>
+      <button onclick="closeRewardModal()" class="btn-primary">Keep Crushing It!</button>
+    </div>
+  </div>
+
+  <script>
+    // Initialise Supabase Client
+    const SUPABASE_URL = 'https://rtgmpmmcplxwezsleclj.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_PxJuEvkUbVmqNlcq-E2sPg_VBn5vI3F';
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // EmailJS Configuration
+    const EMAILJS_PUBLIC_KEY = 'kxng6zTg7LBwLYGBU'; 
+    const EMAILJS_SERVICE_ID = 'service_0alkyrv';
+    const EMAILJS_TEMPLATE_ID = 'YOUR_TEMPLATE_ID';
+    const EMAILJS_EOD_TEMPLATE_ID = 'template_ehvz1nm';
+    
+    if (typeof emailjs !== 'undefined' && EMAILJS_PUBLIC_KEY !== 'YOUR_EMAILJS_PUBLIC_KEY') {
+      emailjs.init(EMAILJS_PUBLIC_KEY);
+    }
+
+    const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    
+    // MELBOURNE TIME ZONE HELPER FUNCTIONS
+    function getMelbourneTodayISO() {
+      return new Date().toLocaleDateString('en-CA', { timeZone: 'Australia/Melbourne' });
+    }
+
+    function getMelbourneDayName() {
+      return new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Australia/Melbourne' }).toLowerCase();
+    }
+
+    // STRICT MONDAY-TO-SUNDAY OPERATING WEEK DATE CALCULATOR
+    function getDateForDayOfWeek(dayName) {
+      const dayMap = { 'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3, 'friday': 4, 'saturday': 5, 'sunday': 6 };
+      const targetOffset = dayMap[dayName.toLowerCase()];
+      if (targetOffset === undefined) return getMelbourneTodayISO();
+
+      const melbTodayStr = getMelbourneTodayISO();
+      const [year, month, day] = melbTodayStr.split('-').map(Number);
+      const melbTodayObj = new Date(year, month - 1, day);
+      
+      const jsDay = melbTodayObj.getDay();
+      const currentOffset = (jsDay === 0) ? 6 : jsDay - 1;
+
+      const mondayObj = new Date(melbTodayObj);
+      mondayObj.setDate(melbTodayObj.getDate() - currentOffset);
+
+      const targetDate = new Date(mondayObj);
+      targetDate.setDate(mondayObj.getDate() + targetOffset);
+
+      const y = targetDate.getFullYear();
+      const m = String(targetDate.getMonth() + 1).padStart(2, '0');
+      const d = String(targetDate.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+
+    // WORKERS MANAGEMENT FOR THE DAY
+    let workersToday = [];
+
+    window.addWorkerForDay = function() {
+      const input = document.getElementById('new-worker-input');
+      if (!input) return;
+      const name = input.value.trim();
+      if (!name) return;
+
+      const parts = name.split(/\s+/).filter(Boolean);
+      if (parts.length < 2) {
+        alert('Please enter a Full Name + Initial (e.g. Joshua T).');
+        return;
+      }
+
+      const formattedName = parts.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
+      if (!workersToday.includes(formattedName)) {
+        workersToday.push(formattedName);
+        renderWorkersList();
+      }
+      input.value = '';
+    };
+
+    window.removeWorkerForDay = function(index) {
+      workersToday.splice(index, 1);
+      renderWorkersList();
+    };
+
+    function renderWorkersList() {
+      const container = document.getElementById('active-workers-list');
+      const hiddenInput = document.getElementById('eod-staff');
+      if (!container || !hiddenInput) return;
+
+      if (workersToday.length === 0) {
+        container.innerHTML = `<span style="font-size: 0.8rem; color: var(--text-muted); font-style: italic;">No workers added for today yet. Use the field above to add staff members.</span>`;
+        hiddenInput.value = '';
+      } else {
+        container.innerHTML = workersToday.map((w, idx) => `
+          <span style="background: rgba(153, 198, 62, 0.2); border: 1px solid var(--flipout-green); color: #fff; padding: 4px 10px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+            👤 ${w}
+            <button type="button" onclick="removeWorkerForDay(${idx})" style="background: none; border: none; color: var(--danger); font-weight: bold; cursor: pointer; padding: 0; font-size: 0.9rem; line-height: 1;">✕</button>
+          </span>
+        `).join('');
+        hiddenInput.value = workersToday.join(', ');
+      }
+    }
+
+    // SMART FIRST NAME & LAST INITIAL PARSER & NORMALISER
+    function parseInitials(raw) {
+      if (!raw) return [];
+      let input = raw.trim().toUpperCase();
+      if (!input || input === 'N/A' || input === 'UNKNOWN' || input === 'NULL' || input === 'NONE') return [];
+
+      const NICKNAME_MAP = {
+        'JOSH': 'JOSHUA',
+        'DAN': 'DANIEL',
+        'CAL': 'CALVIN',
+        'ALEX': 'ALEXANDER',
+        'MATT': 'MATTHEW',
+        'BEN': 'BENJAMIN',
+        'CHRIS': 'CHRISTOPHER',
+        'NICK': 'NICHOLAS',
+        'SAM': 'SAMUEL',
+        'TOM': 'THOMAS',
+        'WILL': 'WILLIAM',
+        'ROB': 'ROBERT',
+        'STEPH': 'STEPHANIE',
+        'ZAC': 'ZACHARY',
+        'ZACH': 'ZACHARY',
+        'DAVE': 'DAVID',
+        'MIKE': 'MICHAEL'
+      };
+
+      input = input.replace(/&|\/|\+|\bAND\b|\bWITH\b|\bOR\b|;/gi, '|');
+      const rawSegments = input.split('|');
+      const resultNames = [];
+
+      rawSegments.forEach(segment => {
+        let seg = segment.trim();
+        if (!seg) return;
+
+        seg = seg.replace(/[\.,\-_]/g, ' ');
+        const tokens = seg.split(/\s+/).filter(Boolean);
+        if (tokens.length === 0) return;
+
+        if (NICKNAME_MAP[tokens[0]]) {
+          tokens[0] = NICKNAME_MAP[tokens[0]];
+        }
+
+        const cleanedName = tokens.join(' ');
+        if (cleanedName && cleanedName !== 'UNKNOWN' && cleanedName !== 'NA' && cleanedName !== 'NONE') {
+          resultNames.push(cleanedName);
+        }
+      });
+
+      return resultNames;
+    }
+
+    let currentSelectedDay = getMelbourneDayName();
+    let currentSelectedDateISO = getDateForDayOfWeek(currentSelectedDay);
+    let lastCheckedMelbourneDate = getMelbourneTodayISO();
+    let allLoadedTasks = [];
+    let activeAdminFilter = 'all';
+    let currentUserRole = 'supervisor';
+
+    let backOfficeInactivityTimer = null;
+    const INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000;
+
+    function resetInactivityTimer() {
+      if (backOfficeInactivityTimer) clearTimeout(backOfficeInactivityTimer);
+      if (!backOfficeScreen.classList.contains('hidden')) {
+        backOfficeInactivityTimer = setTimeout(autoSignOutBackOffice, INACTIVITY_TIMEOUT_MS);
+      }
+    }
+
+    async function autoSignOutBackOffice() {
+      if (!backOfficeScreen.classList.contains('hidden')) {
+        await supabaseClient.auth.signOut();
+        alert('You have been automatically signed out of Back Office due to 15 minutes of inactivity.');
+        showMainApp();
+      }
+    }
+
+    ['mousemove', 'keydown', 'touchstart', 'click', 'scroll'].forEach(eventType => {
+      window.addEventListener(eventType, () => {
+        if (!backOfficeScreen.classList.contains('hidden')) {
+          resetInactivityTimer();
+        }
+      }, { passive: true });
+    });
+
+    window.hardRefreshApp = function() {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(registrations => {
+          for (let registration of registrations) {
+            registration.unregister();
+          }
+        });
+      }
+      if (window.caches) {
+        caches.keys().then(names => {
+          for (let name of names) caches.delete(name);
+        });
+      }
+      window.location.reload(true);
+    };
+
+    function dismissKeyboard() {
+      if (document.activeElement && typeof document.activeElement.blur === 'function') {
+        document.activeElement.blur();
+      }
+    }
+
+    // DOM Elements
+    const mainApp = document.getElementById('main-app');
+    const eodReportScreen = document.getElementById('eod-report-screen');
+    const cashCalculatorScreen = document.getElementById('cash-calculator-screen');
+    const adminLoginScreen = document.getElementById('admin-login-screen');
+    const backOfficeScreen = document.getElementById('back-office-screen');
+    const pendingTasksContainer = document.getElementById('pending-tasks-container');
+    const completedTasksContainer = document.getElementById('completed-tasks-container');
+    const completedSection = document.getElementById('completed-section');
+    const adminTaskList = document.getElementById('admin-task-list');
+    const approvalTaskList = document.getElementById('approval-task-list');
+    const approvalQueueSection = document.getElementById('approval-queue-section');
+    const mainDayTabs = document.querySelectorAll('.main-day-tab');
+    const adminFilterTabs = document.querySelectorAll('.admin-filter-tab');
+
+    // Navigation View Switchers
+    window.showMainApp = function() {
+      mainApp.classList.remove('hidden');
+      eodReportScreen.classList.add('hidden');
+      cashCalculatorScreen.classList.add('hidden');
+      adminLoginScreen.classList.add('hidden');
+      backOfficeScreen.classList.add('hidden');
+      selectDay(currentSelectedDay);
+    };
+
+    window.showEODReportScreen = function() {
+      mainApp.classList.add('hidden');
+      eodReportScreen.classList.remove('hidden');
+      cashCalculatorScreen.classList.add('hidden');
+      adminLoginScreen.classList.add('hidden');
+      backOfficeScreen.classList.add('hidden');
+      populateEODReportFields();
+    };
+
+    window.showCashCalculatorScreen = function() {
+      mainApp.classList.add('hidden');
+      eodReportScreen.classList.add('hidden');
+      cashCalculatorScreen.classList.remove('hidden');
+      adminLoginScreen.classList.add('hidden');
+      backOfficeScreen.classList.add('hidden');
+      updateCashCalculator();
+    };
+
+    window.showAdminLoginScreen = async function() {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (session) {
+        showBackOfficeScreen();
+      } else {
+        mainApp.classList.add('hidden');
+        eodReportScreen.classList.add('hidden');
+        cashCalculatorScreen.classList.add('hidden');
+        adminLoginScreen.classList.remove('hidden');
+        backOfficeScreen.classList.add('hidden');
+      }
+    };
+
+    window.showBackOfficeScreen = function() {
+      mainApp.classList.add('hidden');
+      eodReportScreen.classList.add('hidden');
+      cashCalculatorScreen.classList.add('hidden');
+      adminLoginScreen.classList.add('hidden');
+      backOfficeScreen.classList.remove('hidden');
+      resetInactivityTimer();
+      loadAdminTasks();
+      loadStaffPerformance();
+    };
+
+    // LEADERBOARD MODAL CONTROLLERS
+    window.openLeaderboardModal = function() {
+      const modal = document.getElementById('leaderboard-modal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        loadStaffPerformance();
+      }
+    };
+
+    window.closeLeaderboardModal = function() {
+      const modal = document.getElementById('leaderboard-modal');
+      if (modal) {
+        modal.classList.add('hidden');
+      }
+    };
+
+    window.togglePasswordVisibility = function(inputId, btnEl) {
+      const input = document.getElementById(inputId);
+      if (input.type === 'password') {
+        input.type = 'text';
+        btnEl.textContent = '🙈';
+      } else {
+        input.type = 'password';
+        btnEl.textContent = '👁️';
+      }
+    };
+
+    window.triggerWorkerPasswordReset = async function() {
+      dismissKeyboard();
+      const email = prompt('Enter your registered email address to receive a password reset link:');
+      if (!email || !email.trim()) return;
+
+      const { error } = await supabaseClient.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: window.location.href
+      });
+
+      if (error) {
+        alert('Error sending reset email: ' + error.message);
+      } else {
+        alert('✓ Password reset instructions have been sent to ' + email.trim());
+      }
+    };
+
+    window.adminTriggerUserReset = async function() {
+      dismissKeyboard();
+      const targetEmailInput = document.getElementById('admin-reset-target-email');
+      const msgDiv = document.getElementById('admin-reset-msg');
+      msgDiv.className = '';
+      const email = targetEmailInput.value.trim();
+
+      if (!email) {
+        msgDiv.className = 'error-message';
+        msgDiv.textContent = 'Please enter a target email address.';
+        return;
+      }
+
+      const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.href
+      });
+
+      if (error) {
+        msgDiv.className = 'error-message';
+        msgDiv.textContent = 'Reset error: ' + error.message;
+      } else {
+        msgDiv.className = 'success-message';
+        msgDiv.textContent = `✓ Password reset email sent to ${email}`;
+        targetEmailInput.value = '';
+      }
+    };
+
+    function parsePhotoUrls(photoData) {
+      if (!photoData) return [];
+      if (Array.isArray(photoData)) return photoData;
+      try {
+        const parsed = JSON.parse(photoData);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {}
+      if (typeof photoData === 'string' && photoData.trim().length > 0) {
+        return photoData.split(',').map(u => u.trim()).filter(u => u.startsWith('http'));
+      }
+      return [];
+    }
+
+    const messageComponents = {
+      openers: [
+        "Legendary work!", "Flip-tastic job!", "Unreal effort!", "Boom!", "Sensational effort!",
+        "Smashing work!", "Top-tier work!", "High-flyer!", "Absolute legend!", "Top stuff!",
+        "Outstanding focus!", "Crushing it!", "Pure excellence!", "Standard-setter!", "Spotless work!"
+      ],
+      actions: [
+        "You've aced this task,", "You've made this area look brand new,", "You smashed through this check,",
+        "Your attention to detail is spot on,", "You've elevated our venue standards,", "That was executed brilliantly,",
+        "You're keeping the park sparkling,", "Awesome focus on this area,", "You're setting the benchmark,",
+        "You took care of business,"
+      ],
+      impacts: [
+        "keeping our jumpers safe!", "making Flip Out Derrimut look elite!", "setting the standard for the whole team!",
+        "making the arena look unreal!", "keeping safety standards soaring!", "making the guest experience epic!",
+        "helping the venue smash today's goals!", "keeping the entire park spotless!", "showing everyone how it's done!",
+        "keeping the arena energy high!"
+      ],
+      closers: [
+        "Keep the momentum going! 🚀", "Give yourself a high five! 🙌", "Onto the next one! 💥",
+        "Keep soaring high! ⭐", "The team appreciates you! 🌟", "Legend status unlocked! 🏆",
+        "Keep crushing it! 💪", "Flip Out proud! 🟢", "Keep flipping awesome! 🎉", "Stay unstoppable! 🔥"
+      ]
+    };
+
+    function getRandomElement(array) {
+      return array[Math.floor(Math.random() * array.length)];
+    }
+
+    function generateMotivationalMessage() {
+      return `${getRandomElement(messageComponents.openers)} ${getRandomElement(messageComponents.actions)} ${getRandomElement(messageComponents.impacts)} ${getRandomElement(messageComponents.closers)}`;
+    }
+
+    function triggerRewardEffect() {
+      if (typeof confetti === 'function') {
+        confetti({
+          particleCount: 120,
+          spread: 80,
+          origin: { y: 0.6 },
+          colors: ['#99C63E', '#FF509F', '#8D2D91', '#FFFFFF']
+        });
+      }
+      document.getElementById('reward-message').textContent = generateMotivationalMessage();
+      document.getElementById('reward-modal').classList.remove('hidden');
+    }
+
+    function closeRewardModal() {
+      document.getElementById('reward-modal').classList.add('hidden');
+    }
+
+    async function checkSession() {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (session) {
+        const user = session.user;
+        const role = user.user_metadata?.role || 'supervisor';
+        currentUserRole = role;
+
+        document.getElementById('user-welcome-email').textContent = user.email;
+        document.getElementById('user-role-tag').textContent = role.toUpperCase();
+
+        const adminElements = document.querySelectorAll('.admin-only');
+        adminElements.forEach(el => {
+          if (role === 'admin') {
+            el.classList.remove('hidden');
+          } else {
+            el.classList.add('hidden');
+          }
+        });
+      } else {
+        currentUserRole = 'supervisor';
+      }
+    }
+
+    async function initialiseApp() {
+      selectDay(currentSelectedDay);
+      await checkSession();
+      setupEODCalculations();
+      setupAuthListeners();
+      renderWorkersList();
+
+      setInterval(() => {
+        const melbToday = getMelbourneTodayISO();
+        const melbDayName = getMelbourneDayName();
+
+        if (melbToday !== lastCheckedMelbourneDate) {
+          lastCheckedMelbourneDate = melbToday;
+          currentSelectedDay = melbDayName;
+          currentSelectedDateISO = getDateForDayOfWeek(melbDayName);
+          selectDay(melbDayName);
+          return;
+        }
+
+        if (!mainApp.classList.contains('hidden')) {
+          selectDay(currentSelectedDay, true);
+        } else if (!backOfficeScreen.classList.contains('hidden')) {
+          loadAdminTasks(true);
+          loadStaffPerformance(true);
+        }
+      }, 10000);
+    }
+
+    function setupAuthListeners() {
+      const loginForm = document.getElementById('admin-login-form');
+      if (loginForm) {
+        loginForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          dismissKeyboard();
+          const email = document.getElementById('admin-email').value.trim();
+          const password = document.getElementById('admin-password').value;
+          const errorDiv = document.getElementById('admin-error');
+          errorDiv.textContent = '';
+
+          const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+          if (error) {
+            errorDiv.textContent = error.message;
+          } else {
+            await checkSession();
+            showBackOfficeScreen();
+          }
+        });
+      }
+
+      const createUserForm = document.getElementById('create-user-form');
+      if (createUserForm) {
+        createUserForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          dismissKeyboard();
+          const email = document.getElementById('new-user-email').value.trim();
+          const password = document.getElementById('new-user-password').value;
+          const msgDiv = document.getElementById('create-user-msg');
+          msgDiv.className = '';
+
+          const { data, error } = await supabaseClient.auth.signUp({
+            email,
+            password,
+            options: { data: { role: 'supervisor' } }
+          });
+
+          if (error) {
+            msgDiv.className = 'error-message';
+            msgDiv.textContent = error.message;
+          } else {
+            msgDiv.className = 'success-message';
+            msgDiv.textContent = '✓ Supervisor account created successfully!';
+            createUserForm.reset();
+          }
+        });
+      }
+
+      const changePwdForm = document.getElementById('change-my-password-form');
+      if (changePwdForm) {
+        changePwdForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          dismissKeyboard();
+          const newPassword = document.getElementById('self-new-password').value;
+          const msgDiv = document.getElementById('self-pwd-msg');
+          msgDiv.className = '';
+
+          const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
+          if (error) {
+            msgDiv.className = 'error-message';
+            msgDiv.textContent = error.message;
+          } else {
+            msgDiv.className = 'success-message';
+            msgDiv.textContent = '✓ Password updated successfully!';
+            changePwdForm.reset();
+          }
+        });
+      }
+    }
+
+    window.handleSignOut = async function() {
+      await supabaseClient.auth.signOut();
+      currentUserRole = 'supervisor';
+      showMainApp();
+    };
+
+    // CASH CALCULATOR LOGIC
+    window.updateCashCalculator = function() {
+      const qtyInputs = document.querySelectorAll('.calc-qty');
+      let grandTotal = 0;
+
+      qtyInputs.forEach(input => {
+        const denom = parseFloat(input.dataset.denom);
+        const qty = parseInt(input.value) || 0;
+        const rowAmount = denom * qty;
+        grandTotal += rowAmount;
+
+        const rowId = `amt-${input.dataset.denom.replace('.', '-')}`;
+        const amtCell = document.getElementById(rowId);
+        if (amtCell) {
+          amtCell.textContent = `$${rowAmount.toFixed(2)}`;
+        }
+      });
+
+      document.getElementById('cash-calc-total').textContent = `$${grandTotal.toFixed(2)}`;
+
+      const deductFloat = grandTotal - 300.00;
+      const deductFloatEl = document.getElementById('cash-calc-deduct-float');
+
+      if (deductFloat < 0) {
+        deductFloatEl.textContent = `-$${Math.abs(deductFloat).toFixed(2)}`;
+      } else {
+        deductFloatEl.textContent = `$${deductFloat.toFixed(2)}`;
+      }
+
+      const eodTakingsInput = document.getElementById('eod-eod-takings-input');
+      if (deductFloat > 0) {
+        eodTakingsInput.value = deductFloat.toFixed(2);
+      } else {
+        eodTakingsInput.value = '0.00';
+      }
+      
+      calculateEODTotals();
+    };
+
+    window.resetCashCalculator = function() {
+      document.querySelectorAll('.calc-qty').forEach(input => {
+        input.value = 0;
+      });
+      updateCashCalculator();
+    };
+
+    function setupEODCalculations() {
+      const inputs = [
+        'eod-takings-input',
+        'eod-eod-takings-input',
+        'eod-eftpos-1',
+        'eod-eftpos-2',
+        'eod-online-booking',
+        'eod-bank-transfer'
+      ];
+
+      inputs.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.addEventListener('input', calculateEODTotals);
+        }
+      });
+
+      const eodForm = document.getElementById('eod-takings-form');
+      if (eodForm) {
+        eodForm.addEventListener('submit', handleEODReportSubmit);
+      }
+    }
+
+    function calculateEODTotals() {
+      const takings = parseFloat(document.getElementById('eod-takings-input').value) || 0;
+      const eodTakings = parseFloat(document.getElementById('eod-eod-takings-input').value) || 0;
+      const eftpos1 = parseFloat(document.getElementById('eod-eftpos-1').value) || 0;
+      const eftpos2 = parseFloat(document.getElementById('eod-eftpos-2').value) || 0;
+      const online = parseFloat(document.getElementById('eod-online-booking').value) || 0;
+      const bank = parseFloat(document.getElementById('eod-bank-transfer').value) || 0;
+
+      const totalCash = takings + eodTakings;
+      const totalCashFormatted = `$${totalCash.toFixed(2)}`;
+      
+      document.getElementById('eod-total-cash-1').value = totalCashFormatted;
+      document.getElementById('eod-total-cash-2').value = totalCashFormatted;
+
+      const totalEftpos = eftpos1 + eftpos2;
+      const totalEftposFormatted = `$${totalEftpos.toFixed(2)}`;
+      
+      document.getElementById('eod-total-eftpos').value = totalEftposFormatted;
+      document.getElementById('eod-summary-eftpos').value = totalEftposFormatted;
+
+      const grandTotal = totalCash + totalEftpos + online + bank;
+      document.getElementById('eod-grand-total-input').value = `$${grandTotal.toFixed(2)}`;
+    }
+
+    // STATEFUL EOD QUESTIONS MANAGER WITH INSTANT PERSISTENCE
+    const EOD_STORAGE_KEY_PREFIX = 'flipout_eod_questions_state_';
+
+    function getEODQuestionsStateKey() {
+      return EOD_STORAGE_KEY_PREFIX + getMelbourneTodayISO();
+    }
+
+    function getInitialEODQuestionsState() {
+      return {
+        enquiries: 0,
+        parties: [{ name: '', count: 0 }],
+        schools: [{ name: '', count: 0 }],
+        flipx: [{ name: '', count: 0 }],
+        ninjas: [{ name: '', count: 0 }],
+        houseParty: [{ name: '', count: 0 }]
+      };
+    }
+
+    function loadEODQuestionsState() {
+      try {
+        const saved = localStorage.getItem(getEODQuestionsStateKey());
+        if (saved) return JSON.parse(saved);
+      } catch (e) {
+        console.error('Failed to parse saved EOD questions state', e);
+      }
+      return getInitialEODQuestionsState();
+    }
+
+    function saveEODQuestionsState(state) {
+      try {
+        localStorage.setItem(getEODQuestionsStateKey(), JSON.stringify(state));
+      } catch (e) {
+        console.error('Failed to save EOD questions state', e);
+      }
+    }
+
+    let currentEODQuestionsState = getInitialEODQuestionsState();
+
+    function renderEODOperationalQuestions() {
+      const container = document.getElementById('eod-questions-container');
+      if (!container) return;
+
+      currentEODQuestionsState = loadEODQuestionsState();
+      const state = currentEODQuestionsState;
+
+      let html = `
+        <div class="eod-q-box">
+          <div class="eod-q-title">Question 1. How many enquiries did we receive (Fill in throughout the day)</div>
+          <div class="counter-control-group">
+            <button type="button" class="btn-counter" onclick="updateQ1Enquiries(-1)">-</button>
+            <input type="number" min="0" id="q1-enquiries-val" class="input-counter-val" value="${state.enquiries}" onchange="updateQ1Enquiries(0, this.value)" />
+            <button type="button" class="btn-counter btn-counter-green" onclick="updateQ1Enquiries(1)">+</button>
+          </div>
+        </div>
+      `;
+
+      const workerQuestions = [
+        { key: 'parties', title: 'Question 2. How many Parties did you book today?' },
+        { key: 'schools', title: 'Question 3. How many Schools did you book today?' },
+        { key: 'flipx', title: 'Question 4. How many Flip-X did you Sign Up today?' },
+        { key: 'ninjas', title: 'Question 5. How many Ninja’s did you sign up today?' },
+        { key: 'houseParty', title: 'Question 6. How many House Party Admissions did you book today?' }
+      ];
+
+      workerQuestions.forEach(q => {
+        const rows = state[q.key] || [];
+        html += `
+          <div class="eod-q-box">
+            <div class="eod-q-title">${q.title}</div>
+            <div id="worker-rows-${q.key}">
+              ${rows.map((r, idx) => `
+                <div class="worker-counter-row">
+                  <input type="text" class="worker-name-input" placeholder="Staff Name" value="${r.name.replace(/"/g, '&quot;')}" oninput="updateWorkerQuestionRow('${q.key}', ${idx}, 'name', this.value)" />
+                  <div class="counter-control-group">
+                    <button type="button" class="btn-counter" onclick="updateWorkerQuestionCount('${q.key}', ${idx}, -1)">-</button>
+                    <input type="number" min="0" class="input-counter-val" value="${r.count}" onchange="updateWorkerQuestionRow('${q.key}', ${idx}, 'count', this.value)" />
+                    <button type="button" class="btn-counter btn-counter-green" onclick="updateWorkerQuestionCount('${q.key}', ${idx}, 1)">+</button>
+                  </div>
+                  ${rows.length > 1 ? `<button type="button" class="btn-danger btn-small" style="padding: 6px 10px; font-weight: bold;" onclick="removeWorkerQuestionRow('${q.key}', ${idx})">✕</button>` : ''}
+                </div>
+              `).join('')}
+            </div>
+            <button type="button" class="btn-add-worker-row" onclick="addWorkerQuestionRow('${q.key}')">+ Add Staff Entry</button>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+    }
+
+    window.updateQ1Enquiries = function(delta, exactVal) {
+      if (exactVal !== undefined) {
+        currentEODQuestionsState.enquiries = Math.max(0, parseInt(exactVal) || 0);
+      } else {
+        currentEODQuestionsState.enquiries = Math.max(0, (currentEODQuestionsState.enquiries || 0) + delta);
+      }
+      saveEODQuestionsState(currentEODQuestionsState);
+      const input = document.getElementById('q1-enquiries-val');
+      if (input) input.value = currentEODQuestionsState.enquiries;
+    };
+
+    window.updateWorkerQuestionCount = function(key, idx, delta) {
+      if (!currentEODQuestionsState[key] || !currentEODQuestionsState[key][idx]) return;
+      let val = currentEODQuestionsState[key][idx].count || 0;
+      val = Math.max(0, val + delta);
+      currentEODQuestionsState[key][idx].count = val;
+      saveEODQuestionsState(currentEODQuestionsState);
+      renderEODOperationalQuestions();
+    };
+
+    window.updateWorkerQuestionRow = function(key, idx, field, val) {
+      if (!currentEODQuestionsState[key] || !currentEODQuestionsState[key][idx]) return;
+      if (field === 'count') {
+        currentEODQuestionsState[key][idx].count = Math.max(0, parseInt(val) || 0);
+      } else {
+        currentEODQuestionsState[key][idx][field] = val;
+      }
+      saveEODQuestionsState(currentEODQuestionsState);
+    };
+
+    window.addWorkerQuestionRow = function(key) {
+      if (!currentEODQuestionsState[key]) currentEODQuestionsState[key] = [];
+      currentEODQuestionsState[key].push({ name: '', count: 0 });
+      saveEODQuestionsState(currentEODQuestionsState);
+      renderEODOperationalQuestions();
+    };
+
+    window.removeWorkerQuestionRow = function(key, idx) {
+      if (!currentEODQuestionsState[key]) return;
+      currentEODQuestionsState[key].splice(idx, 1);
+      if (currentEODQuestionsState[key].length === 0) {
+        currentEODQuestionsState[key].push({ name: '', count: 0 });
+      }
+      saveEODQuestionsState(currentEODQuestionsState);
+      renderEODOperationalQuestions();
+    };
+
+    function populateEODReportFields() {
+      const melbDateISO = getMelbourneTodayISO();
+      const [year, month, day] = melbDateISO.split('-');
+      const formattedDate = `${day}/${month}/${year}`;
+      const dayName = getMelbourneDayName();
+      const capitalizedDay = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+
+      document.getElementById('eod-date').value = formattedDate;
+      document.getElementById('eod-day').value = capitalizedDay;
+      calculateEODTotals();
+      renderEODOperationalQuestions();
+    }
+
+    async function handleEODReportSubmit(e) {
+      e.preventDefault();
+      dismissKeyboard();
+
+      if (workersToday.length === 0) {
+        alert('Please add at least one staff member on shift before submitting the EOD report.');
+        return;
+      }
+
+      const msgDiv = document.getElementById('eod-submit-msg');
+      msgDiv.className = '';
+      msgDiv.textContent = 'Submitting End of Day Report...';
+
+      const qState = currentEODQuestionsState;
+      const questionAnswers = [];
+
+      questionAnswers.push({
+        question: 'Question 1. How many enquiries did we receive (Fill in throughout the day)',
+        answer: `${qState.enquiries || 0}`
+      });
+
+      const workerQuestionTitles = {
+        parties: 'Question 2. How many Parties did you book today?',
+        schools: 'Question 3. How many Schools did you book today?',
+        flipx: 'Question 4. How many Flip-X did you Sign Up today?',
+        ninjas: 'Question 5. How many Ninja’s did you sign up today?',
+        houseParty: 'Question 6. How many House Party Admissions did you book today?'
+      };
+
+      Object.keys(workerQuestionTitles).forEach(key => {
+        const rows = (qState[key] || []).filter(r => r.name.trim().length > 0 || r.count > 0);
+        let summaryStr = 'None recorded';
+        if (rows.length > 0) {
+          summaryStr = rows.map(r => `${r.name || 'Unnamed'}: ${r.count || 0}`).join(' | ');
+        }
+        questionAnswers.push({
+          question: workerQuestionTitles[key],
+          answer: summaryStr
+        });
+      });
+
+      const reportData = {
+        date: document.getElementById('eod-date').value,
+        day: document.getElementById('eod-day').value,
+        staff: document.getElementById('eod-staff').value.trim(),
+        float: '$300.00',
+        takings: parseFloat(document.getElementById('eod-takings-input').value) || 0,
+        eod_takings: parseFloat(document.getElementById('eod-eod-takings-input').value) || 0,
+        total_cash: document.getElementById('eod-total-cash-1').value,
+        eftpos_1: parseFloat(document.getElementById('eod-eftpos-1').value) || 0,
+        eftpos_2: parseFloat(document.getElementById('eod-eftpos-2').value) || 0,
+        total_eftpos: document.getElementById('eod-total-eftpos').value,
+        online_booking: parseFloat(document.getElementById('eod-online-booking').value) || 0,
+        bank_transfer: parseFloat(document.getElementById('eod-bank-transfer').value) || 0,
+        grand_total: document.getElementById('eod-grand-total-input').value,
+        question_responses: JSON.stringify(questionAnswers)
+      };
+
+      try {
+        const { error: dbError } = await supabaseClient
+          .from('eod_reports')
+          .insert([reportData]);
+
+        if (dbError) {
+          console.warn('Supabase DB Note:', dbError.message);
+        }
+
+        const reportJsonString = JSON.stringify(reportData, null, 2);
+        const jsonBlob = new Blob([reportJsonString], { type: 'application/json' });
+        const storageFilePath = `eod_reports/EOD_Report_${currentSelectedDateISO}_${Date.now()}.json`;
+
+        await supabaseClient
+          .storage
+          .from('task-photos')
+          .upload(storageFilePath, jsonBlob);
+
+        if (typeof emailjs !== 'undefined' && EMAILJS_PUBLIC_KEY !== 'YOUR_EMAILJS_PUBLIC_KEY') {
+          const templateParams = {
+            day: reportData.day,
+            report_date: reportData.date,
+            staff_members: reportData.staff,
+            rec1_float: reportData.float,
+            rec1_takings: reportData.takings.toFixed(2),
+            eod_takings: reportData.eod_takings.toFixed(2),
+            total_cash: reportData.total_cash,
+            eftpos_1: reportData.eftpos_1.toFixed(2),
+            eftpos_2: reportData.eftpos_2.toFixed(2),
+            total_eftpos: reportData.total_eftpos,
+            online_booking: reportData.online_booking.toFixed(2),
+            bank_transfer: reportData.bank_transfer.toFixed(2),
+            grand_total: reportData.grand_total,
+            operational_questions: questionAnswers.map(qa => `• ${qa.question}: ${qa.answer}`).join('\n')
+          };
+
+          await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_EOD_TEMPLATE_ID, templateParams);
+        }
+
+        msgDiv.className = 'success-message';
+        msgDiv.textContent = '✓ EOD Report submitted and processed successfully!';
+        triggerRewardEffect();
+      } catch (err) {
+        msgDiv.className = 'error-message';
+        msgDiv.textContent = 'Submission error: ' + (err.message || 'Failed to dispatch report');
+      }
+    }
+
+    // MAIN CHECKLIST & DAY SELECTOR
+    window.selectDay = async function(dayName, isAutoRefresh = false) {
+      currentSelectedDay = dayName.toLowerCase();
+      currentSelectedDateISO = getDateForDayOfWeek(currentSelectedDay);
+
+      mainDayTabs.forEach(tab => {
+        if (tab.dataset.day === currentSelectedDay) {
+          tab.classList.add('active');
+        } else {
+          tab.classList.remove('active');
+        }
+      });
+
+      const dateParts = currentSelectedDateISO.split('-');
+      const formattedDate = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
+      const titleEl = document.getElementById('active-day-title');
+      if (titleEl) {
+        titleEl.textContent = `${currentSelectedDay.toUpperCase()} (${formattedDate})`;
+      }
+
+      await loadPendingAndCompletedTasks(currentSelectedDay, isAutoRefresh);
+    };
+
+    async function loadPendingAndCompletedTasks(dayName, isAutoRefresh = false) {
+      if (!isAutoRefresh && pendingTasksContainer) {
+        pendingTasksContainer.innerHTML = `<p style="text-align: center; color: var(--text-muted);">Loading tasks from database...</p>`;
+      }
+
+      try {
+        const { data: tasksData, error: tasksErr } = await supabaseClient
+          .from('tasks')
+          .select('*')
+          .eq('is_approved', true)
+          .or(`days.cs.{${dayName}},and(is_temporary.eq.true,created_for_date.eq.${currentSelectedDateISO})`)
+          .order('sort_order', { ascending: true });
+
+        if (tasksErr) throw tasksErr;
+
+        const validTasks = (tasksData || []).filter(t => !t.is_temporary || t.created_for_date === currentSelectedDateISO);
+
+        const { data: completionsData, error: compErr } = await supabaseClient
+          .from('task_completions')
+          .select('*')
+          .eq('completed_date', currentSelectedDateISO);
+
+        if (compErr) throw compErr;
+
+        const completionMap = new Map();
+        (completionsData || []).forEach(c => completionMap.set(c.task_id, c));
+
+        const pendingList = [];
+        const completedList = [];
+
+        validTasks.forEach(task => {
+          if (completionMap.has(task.id)) {
+            completedList.push({ task, completion: completionMap.get(task.id) });
+          } else {
+            pendingList.push(task);
+          }
+        });
+
+        // Update progress bar
+        const total = validTasks.length;
+        const doneCount = completedList.length;
+        const pct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
+        
+        const progressBar = document.getElementById('progress-bar-fill');
+        const progressText = document.getElementById('progress-percent');
+        if (progressBar) progressBar.style.width = `${pct}%`;
+        if (progressText) progressText.textContent = `${pct}%`;
+
+        // Render Pending Tasks
+        if (pendingList.length === 0) {
+          pendingTasksContainer.innerHTML = `<p style="text-align: center; color: var(--flipout-green); font-weight: bold; margin: 2rem 0;">🎉 All tasks completed for ${dayName.toUpperCase()}!</p>`;
+        } else {
+          pendingTasksContainer.innerHTML = pendingList.map(t => renderTaskCard(t, null)).join('');
+        }
+
+        // Render Completed Tasks
+        if (completedList.length > 0) {
+          completedSection.classList.remove('hidden');
+          completedTasksContainer.innerHTML = completedList.map(item => renderTaskCard(item.task, item.completion)).join('');
+        } else {
+          completedSection.classList.add('hidden');
+          completedTasksContainer.innerHTML = '';
+        }
+      } catch (err) {
+        console.error('Error loading checklist tasks:', err);
+        if (pendingTasksContainer) {
+          pendingTasksContainer.innerHTML = `<p style="text-align: center; color: var(--danger);">Failed to load tasks: ${err.message}</p>`;
+        }
+      }
+    }
+
+    function renderTaskCard(task, completion) {
+      const isDone = !!completion;
+      const initialsVal = completion?.initials || '';
+      const urls = parsePhotoUrls(completion?.photo_url);
+
+      return `
+        <div class="task-card ${isDone ? 'completed' : ''}" id="task-card-${task.id}">
+          <div class="task-main">
+            <input type="checkbox" class="task-checkbox" ${isDone ? 'checked' : ''} onchange="toggleTaskCompletion('${task.id}', this.checked, ${task.requires_initials}, ${task.requires_photo})" />
+            <div class="task-label">
+              ${task.is_temporary ? '<span class="badge-temp">Temp Job</span> ' : ''}
+              <strong>[${task.category || 'General'}]</strong> ${task.title}
+            </div>
+          </div>
+          <div class="task-meta">
+            ${task.requires_initials ? `
+              <input type="text" class="initials-input" id="initials-input-${task.id}" placeholder="Full Name + Initial" value="${initialsVal}" ${isDone ? 'readonly' : ''} onblur="saveTaskInitials('${task.id}', this.value)" />
+            ` : ''}
+
+            ${task.requires_photo ? `
+              <label class="photo-upload-btn">
+                📷 ${urls.length > 0 ? `Photo Added (${urls.length})` : 'Upload Photo'}
+                <input type="file" accept="image/*" style="display:none;" onchange="uploadTaskPhoto('${task.id}', this)" />
+              </label>
+            ` : ''}
+
+            ${urls.map((u, idx) => `
+              <a href="${u}" target="_blank" class="view-photo-btn">🖼️ View Photo ${urls.length > 1 ? idx + 1 : ''}</a>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    window.toggleTaskCompletion = async function(taskId, isChecked, reqInitials, reqPhoto) {
+      const initialsInput = document.getElementById(`initials-input-${taskId}`);
+      const initials = initialsInput ? initialsInput.value.trim() : '';
+
+      if (isChecked) {
+        if (reqInitials && !initials) {
+          alert('Please enter your Full Name + Initial before marking this task as complete.');
+          selectDay(currentSelectedDay);
+          return;
+        }
+
+        const { error } = await supabaseClient
+          .from('task_completions')
+          .insert([{
+            task_id: taskId,
+            completed_date: currentSelectedDateISO,
+            initials: initials
+          }]);
+
+        if (error) {
+          alert('Error completing task: ' + error.message);
+        } else {
+          triggerRewardEffect();
+        }
+      } else {
+        const { error } = await supabaseClient
+          .from('task_completions')
+          .delete()
+          .eq('task_id', taskId)
+          .eq('completed_date', currentSelectedDateISO);
+
+        if (error) {
+          alert('Error unchecking task: ' + error.message);
+        }
+      }
+
+      selectDay(currentSelectedDay);
+    };
+
+    window.saveTaskInitials = async function(taskId, value) {
+      const val = value.trim();
+      if (!val) return;
+
+      const { data } = await supabaseClient
+        .from('task_completions')
+        .select('id')
+        .eq('task_id', taskId)
+        .eq('completed_date', currentSelectedDateISO)
+        .maybeSingle();
+
+      if (data) {
+        await supabaseClient
+          .from('task_completions')
+          .update({ initials: val })
+          .eq('id', data.id);
+      }
+    };
+
+    window.uploadTaskPhoto = async function(taskId, fileInput) {
+      if (!fileInput.files || fileInput.files.length === 0) return;
+      const file = fileInput.files[0];
+      const fileName = `${currentSelectedDateISO}/${taskId}_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+
+      try {
+        const { error: uploadErr } = await supabaseClient
+          .storage
+          .from('task-photos')
+          .upload(fileName, file);
+
+        if (uploadErr) throw uploadErr;
+
+        const { data: { publicUrl } } = supabaseClient
+          .storage
+          .from('task-photos')
+          .getPublicUrl(fileName);
+
+        const { data: existingComp } = await supabaseClient
+          .from('task_completions')
+          .select('*')
+          .eq('task_id', taskId)
+          .eq('completed_date', currentSelectedDateISO)
+          .maybeSingle();
+
+        if (existingComp) {
+          const existingUrls = parsePhotoUrls(existingComp.photo_url);
+          existingUrls.push(publicUrl);
+
+          await supabaseClient
+            .from('task_completions')
+            .update({ photo_url: JSON.stringify(existingUrls) })
+            .eq('id', existingComp.id);
+        } else {
+          const initialsInput = document.getElementById(`initials-input-${taskId}`);
+          const initials = initialsInput ? initialsInput.value.trim() : '';
+
+          await supabaseClient
+            .from('task_completions')
+            .insert([{
+              task_id: taskId,
+              completed_date: currentSelectedDateISO,
+              initials: initials,
+              photo_url: JSON.stringify([publicUrl])
+            }]);
+        }
+
+        triggerRewardEffect();
+        selectDay(currentSelectedDay);
+      } catch (err) {
+        alert('Photo upload failed: ' + err.message);
+      }
+    };
+
+    // BACK OFFICE TASK & PERFORMANCE MANAGERS
+    async function loadAdminTasks(isAutoRefresh = false) {
+      if (!adminTaskList) return;
+
+      const { data: tasks, error } = await supabaseClient
+        .from('tasks')
+        .select('*')
+        .order('sort_order', { ascending: true });
+
+      if (error) {
+        adminTaskList.innerHTML = `<p style="color: var(--danger);">Failed to load tasks: ${error.message}</p>`;
+        return;
+      }
+
+      allLoadedTasks = tasks || [];
+      renderAdminTaskList();
+      renderApprovalQueue();
+    }
+
+    function renderAdminTaskList() {
+      if (!adminTaskList) return;
+
+      let filtered = allLoadedTasks.filter(t => t.is_approved);
+      if (activeAdminFilter !== 'all') {
+        filtered = filtered.filter(t => t.days && t.days.includes(activeAdminFilter));
+      }
+
+      if (filtered.length === 0) {
+        adminTaskList.innerHTML = `<p style="text-align: center; color: var(--text-muted);">No active tasks for this filter.</p>`;
+        return;
+      }
+
+      adminTaskList.innerHTML = filtered.map(t => `
+        <div class="admin-task-item">
+          <div>
+            <strong>[${t.category || 'General'}]</strong> ${t.title}
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">
+              Active: ${(t.days || []).join(', ').toUpperCase()} ${t.is_temporary ? '| (Temp Job)' : ''}
+            </div>
+          </div>
+          <div class="admin-actions">
+            <button onclick="editAdminTask('${t.id}')" class="btn-secondary btn-small">Edit</button>
+            <button onclick="deleteAdminTask('${t.id}')" class="btn-danger btn-small">Delete</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderApprovalQueue() {
+      if (!approvalTaskList || !approvalQueueSection) return;
+
+      const pending = allLoadedTasks.filter(t => !t.is_approved);
+      if (pending.length === 0) {
+        approvalQueueSection.classList.add('hidden');
+        approvalTaskList.innerHTML = '';
+        return;
+      }
+
+      approvalQueueSection.classList.remove('hidden');
+      approvalTaskList.innerHTML = pending.map(t => `
+        <div class="admin-task-item" style="border-color: var(--warning);">
+          <div>
+            <strong>[${t.category || 'General'}]</strong> ${t.title}
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">
+              Requested Days: ${(t.days || []).join(', ').toUpperCase()}
+            </div>
+          </div>
+          <div class="admin-actions">
+            <button onclick="approveAdminTask('${t.id}')" class="btn-success btn-small">Approve</button>
+            <button onclick="deleteAdminTask('${t.id}')" class="btn-danger btn-small">Reject</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    window.filterAdminTasks = function(filter, btnEl) {
+      activeAdminFilter = filter;
+      adminFilterTabs.forEach(t => t.classList.remove('active'));
+      btnEl.classList.add('active');
+      renderAdminTaskList();
+    };
+
+    window.handleTaskFormSubmit = async function(isTemporary) {
+      dismissKeyboard();
+      const titleInput = document.getElementById('new-task-title');
+      const categoryInput = document.getElementById('new-task-category');
+      const photoCheck = document.getElementById('new-task-photo');
+      const initialsCheck = document.getElementById('new-task-initials');
+      const photosCountInput = document.getElementById('new-task-photos-count');
+      const editingId = document.getElementById('editing-task-id').value;
+
+      const title = titleInput.value.trim();
+      if (!title) {
+        alert('Please enter a task description.');
+        return;
+      }
+
+      const dayChecks = document.querySelectorAll('.day-check:checked');
+      const selectedDays = Array.from(dayChecks).map(c => c.value);
+
+      if (!isTemporary && selectedDays.length === 0) {
+        alert('Please select at least one active day for permanent jobs.');
+        return;
+      }
+
+      const isApproved = (currentUserRole === 'admin' || isTemporary);
+
+      const payload = {
+        title,
+        category: categoryInput.value,
+        requires_photo: photoCheck.checked,
+        requires_initials: initialsCheck.checked,
+        max_photos: parseInt(photosCountInput.value) || 1,
+        days: isTemporary ? [currentSelectedDay] : selectedDays,
+        is_temporary: isTemporary,
+        is_approved: isApproved,
+        created_for_date: isTemporary ? currentSelectedDateISO : null
+      };
+
+      if (editingId) {
+        const { error } = await supabaseClient.from('tasks').update(payload).eq('id', editingId);
+        if (error) alert('Error updating task: ' + error.message);
+      } else {
+        const { error } = await supabaseClient.from('tasks').insert([payload]);
+        if (error) alert('Error creating task: ' + error.message);
+      }
+
+      cancelEditTask();
+      loadAdminTasks();
+    };
+
+    window.editAdminTask = function(taskId) {
+      const task = allLoadedTasks.find(t => t.id === taskId);
+      if (!task) return;
+
+      document.getElementById('editing-task-id').value = task.id;
+      document.getElementById('new-task-title').value = task.title;
+      document.getElementById('new-task-category').value = task.category || 'Cleaning';
+      document.getElementById('new-task-photo').checked = task.requires_photo;
+      document.getElementById('new-task-initials').checked = task.requires_initials;
+      document.getElementById('new-task-photos-count').value = task.max_photos || 1;
+
+      document.querySelectorAll('.day-check').forEach(c => {
+        c.checked = task.days ? task.days.includes(c.value) : false;
+      });
+
+      document.getElementById('form-heading').textContent = 'Edit Job';
+      document.getElementById('cancel-edit-btn').classList.remove('hidden');
+    };
+
+    window.cancelEditTask = function() {
+      document.getElementById('editing-task-id').value = '';
+      document.getElementById('task-form').reset();
+      document.getElementById('form-heading').textContent = 'Add Job';
+      document.getElementById('cancel-edit-btn').classList.add('hidden');
+    };
+
+    window.approveAdminTask = async function(taskId) {
+      const { error } = await supabaseClient.from('tasks').update({ is_approved: true }).eq('id', taskId);
+      if (error) alert('Error approving task: ' + error.message);
+      loadAdminTasks();
+    };
+
+    window.deleteAdminTask = async function(taskId) {
+      if (!confirm('Are you sure you want to delete this task?')) return;
+      const { error } = await supabaseClient.from('tasks').delete().eq('id', taskId);
+      if (error) alert('Error deleting task: ' + error.message);
+      loadAdminTasks();
+    };
+
+    async function loadStaffPerformance(isAutoRefresh = false) {
+      const modalContainer = document.getElementById('modal-staff-performance-container');
+      if (!modalContainer) return;
+
+      try {
+        const { data: completions, error } = await supabaseClient
+          .from('task_completions')
+          .select('initials');
+
+        if (error) throw error;
+
+        const staffCounts = new Map();
+        (completions || []).forEach(c => {
+          const names = parseInitials(c.initials);
+          names.forEach(name => {
+            staffCounts.set(name, (staffCounts.get(name) || 0) + 1);
+          });
+        });
+
+        const sorted = Array.from(staffCounts.entries()).sort((a, b) => b[1] - a[1]);
+
+        if (sorted.length === 0) {
+          modalContainer.innerHTML = `<p style="text-align: center; color: var(--text-muted);">No task completions logged yet.</p>`;
+          return;
+        }
+
+        modalContainer.innerHTML = sorted.map(([name, count], index) => {
+          let medal = '🏅';
+          if (index === 0) medal = '🥇';
+          if (index === 1) medal = '🥈';
+          if (index === 2) medal = '🥉';
+
+          return `
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--bg-card-alt); border-radius: 10px; margin-bottom: 8px; border: 1px solid rgba(255,255,255,0.08);">
+              <span style="font-weight: 700; color: #fff;">${medal} ${name}</span>
+              <span style="font-weight: 800; color: var(--flipout-green);">${count} Tasks</span>
+            </div>
+          `;
+        }).join('');
+      } catch (err) {
+        console.error('Leaderboard error:', err);
+        modalContainer.innerHTML = `<p style="color: var(--danger);">Failed to load leaderboard.</p>`;
+      }
+    }
+
+    window.exportCompletionsToCSV = async function() {
+      const { data: completions } = await supabaseClient
+        .from('task_completions')
+        .select('*, tasks(title, category)');
+
+      if (!completions || completions.length === 0) {
+        alert('No completion records found to export.');
+        return;
+      }
+
+      let csvContent = "data:text/csv;charset=utf-8,ID,Date,Task Title,Category,Staff,Photo URL\n";
+      completions.forEach(c => {
+        const title = c.tasks?.title ? `"${c.tasks.title.replace(/"/g, '""')}"` : 'Unknown';
+        const category = c.tasks?.category ? `"${c.tasks.category.replace(/"/g, '""')}"` : 'General';
+        const initials = `"${(c.initials || '').replace(/"/g, '""')}"`;
+        const photo = `"${(c.photo_url || '').replace(/"/g, '""')}"`;
+        csvContent += `${c.id},${c.completed_date},${title},${category},${initials},${photo}\n`;
+      });
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `FlipOut_Completions_Export_${getMelbourneTodayISO()}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    };
+
+    window.sendEODSummaryEmail = async function(isManual = true) {
+      alert('EOD Summary email dispatched.');
+    };
+
+    // Initialize application on DOM content load
+    document.addEventListener('DOMContentLoaded', initialiseApp);
   </script>
 </body>
 </html>

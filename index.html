@@ -885,7 +885,7 @@
         </div>
         <div class="form-group" style="margin-bottom: 0;">
           <label for="eod-staff">Staff Member/s:</label>
-          <input type="text" id="eod-staff" placeholder="e.g. ua, Stephanie, Maryann" required />
+          <input type="text" id="eod-staff" placeholder="e.g. Joshua, Stephanie, Maryann" required />
         </div>
       </div>
 
@@ -1332,8 +1332,6 @@
     }
 
     // STRICT MONDAY-TO-SUNDAY OPERATING WEEK DATE CALCULATOR
-    // Ensures all 7 tabs (Mon-Sun) map exclusively to the CURRENT calendar week.
-    // At 12:00am Monday Midnight, the week rolls over and resets all completed job ticks for the new week!
     function getDateForDayOfWeek(dayName) {
       const dayMap = { 'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3, 'friday': 4, 'saturday': 5, 'sunday': 6 };
       const targetOffset = dayMap[dayName.toLowerCase()];
@@ -1343,16 +1341,12 @@
       const [year, month, day] = melbTodayStr.split('-').map(Number);
       const melbTodayObj = new Date(year, month - 1, day);
       
-      // JS getDay(): 0 = Sun, 1 = Mon, 2 = Tue, 3 = Wed, 4 = Thu, 5 = Fri, 6 = Sat
       const jsDay = melbTodayObj.getDay();
-      // Map so Monday = 0, Tuesday = 1, ..., Sunday = 6
       const currentOffset = (jsDay === 0) ? 6 : jsDay - 1;
 
-      // Calculate Monday date of the current operating week
       const mondayObj = new Date(melbTodayObj);
       mondayObj.setDate(melbTodayObj.getDate() - currentOffset);
 
-      // Target date for requested day in the current operating week
       const targetDate = new Date(mondayObj);
       targetDate.setDate(mondayObj.getDate() + targetOffset);
 
@@ -1363,14 +1357,11 @@
     }
 
     // SMART FIRST NAME & LAST INITIAL PARSER & NORMALISER
-    // Handles formats like "Joshua.T", "Joshua, T", "Josh T", "Josh.T", "Joshua T.", "Josh,T", etc.
-    // Automatically cleans dots, commas, dashes, multiple spaces and maps shorthand nicknames (e.g. Josh -> Joshua)
     function parseInitials(raw) {
       if (!raw) return [];
       let input = raw.trim().toUpperCase();
       if (!input || input === 'N/A' || input === 'UNKNOWN' || input === 'NULL' || input === 'NONE') return [];
 
-      // Map common first-name shorthands to ensure accurate aggregation
       const NICKNAME_MAP = {
         'JOSH': 'JOSHUA',
         'DAN': 'DANIEL',
@@ -1391,9 +1382,7 @@
         'MIKE': 'MICHAEL'
       };
 
-      // Replace multi-person delimiters (&, /, +, AND, WITH, OR, ;) with '|'
       input = input.replace(/&|\/|\+|\bAND\b|\bWITH\b|\bOR\b|;/gi, '|');
-
       const rawSegments = input.split('|');
       const resultNames = [];
 
@@ -1401,14 +1390,10 @@
         let seg = segment.trim();
         if (!seg) return;
 
-        // Replace dots, commas, dashes, underscores with spaces
         seg = seg.replace(/[\.,\-_]/g, ' ');
-
-        // Split by whitespace
         const tokens = seg.split(/\s+/).filter(Boolean);
         if (tokens.length === 0) return;
 
-        // Normalize shorthand first name token if matched
         if (NICKNAME_MAP[tokens[0]]) {
           tokens[0] = NICKNAME_MAP[tokens[0]];
         }
@@ -1429,7 +1414,6 @@
     let activeAdminFilter = 'all';
     let currentUserRole = 'supervisor';
 
-    // 15-MINUTE AUTO SIGN OUT INACTIVITY TIMER FOR BACK OFFICE
     let backOfficeInactivityTimer = null;
     const INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000;
 
@@ -1707,12 +1691,10 @@
       setupEODCalculations();
       setupAuthListeners();
 
-      // 12:00AM MIDNIGHT AUTOMATIC RESET & POLLING CHECKER
       setInterval(() => {
         const melbToday = getMelbourneTodayISO();
         const melbDayName = getMelbourneDayName();
 
-        // Detect 12:00am Midnight Rollover (Date Change)
         if (melbToday !== lastCheckedMelbourneDate) {
           lastCheckedMelbourneDate = melbToday;
           currentSelectedDay = melbDayName;
@@ -2232,6 +2214,7 @@
       if (files.length > maxPhotos) {
         alert(`You can upload a maximum of ${maxPhotos} photo(s) for this task.`);
         fileInput.value = '';
+        delete fileInput.dataset.uploadedUrls;
         return null;
       }
 
@@ -2252,6 +2235,7 @@
         if (error) {
           alert(`Photo ${i + 1} upload failed: ` + error.message);
           if (statusSpan) statusSpan.textContent = 'Upload failed';
+          delete fileInput.dataset.uploadedUrls;
           return null;
         }
 
@@ -2266,6 +2250,7 @@
       }
 
       if (statusSpan) statusSpan.textContent = `✓ ${uploadedUrls.length} photo(s) ready`;
+      fileInput.dataset.uploadedUrls = JSON.stringify(uploadedUrls);
       return uploadedUrls;
     };
 
@@ -2289,14 +2274,24 @@
         let photoUrls = [];
         if (task.requires_photo) {
           const fileInput = document.getElementById(`photos-${taskId}`);
-          if (fileInput && fileInput.files && fileInput.files.length > 0) {
+          if (fileInput && fileInput.dataset.uploadedUrls) {
+            try {
+              photoUrls = JSON.parse(fileInput.dataset.uploadedUrls);
+            } catch (e) {
+              photoUrls = [];
+            }
+          }
+          
+          if (photoUrls.length === 0 && fileInput && fileInput.files && fileInput.files.length > 0) {
             const uploaded = await handleTaskPhotoSelect(fileInput, taskId, task.max_photos || 1);
             if (!uploaded || uploaded.length === 0) {
               document.getElementById(`task-${taskId}`).checked = false;
               return;
             }
             photoUrls = uploaded;
-          } else {
+          }
+
+          if (photoUrls.length === 0) {
             alert('Please select/take photo(s) before marking this task as complete.');
             document.getElementById(`task-${taskId}`).checked = false;
             return;
@@ -2344,104 +2339,137 @@
         adminTaskList.innerHTML = `<p style="text-align: center; color: var(--text-muted);">Loading tasks...</p>`;
       }
 
-      // 1. Pending unapproved permanent tasks
-      const { data: pendingTasks } = await supabaseClient
-        .from('tasks')
-        .select('*')
-        .eq('is_approved', false)
-        .order('created_at', { ascending: false });
-
-      if (approvalQueueSection && approvalTaskList) {
-        if (pendingTasks && pendingTasks.length > 0) {
-          approvalQueueSection.classList.remove('hidden');
-          approvalTaskList.innerHTML = pendingTasks.map(task => `
-            <div class="admin-task-item">
-              <div>
-                <strong>${task.title}</strong>
-                <div style="font-size:0.75rem; color: var(--text-muted); margin-top:2px;">
-                  Category: ${task.category} | Days: ${(task.days || []).join(', ')}
-                </div>
-              </div>
-              <div class="admin-actions">
-                <button onclick="approveTask('${task.id}')" class="btn-success btn-small">Approve</button>
-                <button onclick="rejectTask('${task.id}')" class="btn-danger btn-small">Reject</button>
-              </div>
-            </div>
-          `).join('');
-        } else {
-          approvalQueueSection.classList.add('hidden');
-          approvalTaskList.innerHTML = '';
-        }
-      }
-
-      // 2. Active approved tasks
       const { data: tasks, error } = await supabaseClient
         .from('tasks')
         .select('*')
-        .eq('is_approved', true)
         .order('sort_order', { ascending: true });
 
       if (error) {
-        if (!isSilent) adminTaskList.innerHTML = `<p class="error-message">Error loading tasks: ${error.message}</p>`;
+        if (!isSilent) adminTaskList.innerHTML = `<p class="error-message">Error: ${error.message}</p>`;
         return;
       }
 
-      let filtered = tasks || [];
-      if (activeAdminFilter !== 'all') {
-        filtered = filtered.filter(t => t.days && t.days.includes(activeAdminFilter));
-      }
+      const approved = (tasks || []).filter(t => t.is_approved);
+      const pending = (tasks || []).filter(t => !t.is_approved);
 
-      if (filtered.length === 0) {
-        adminTaskList.innerHTML = `<p style="text-align: center; color: var(--text-muted);">No tasks match the selected filter.</p>`;
-        return;
-      }
-
-      adminTaskList.innerHTML = filtered.map(task => `
-        <div class="admin-task-item">
-          <div>
-            <strong>${task.title} ${task.is_temporary ? '<span class="badge-temp">Today Only</span>' : ''}</strong>
-            <div style="font-size:0.75rem; color: var(--text-muted); margin-top:2px;">
-              Category: ${task.category} | Days: ${(task.days || []).join(', ') || 'None'} | Photos: ${task.requires_photo ? `Max ${task.max_photos || 1}` : 'No'} | Name: ${task.requires_initials ? 'Yes' : 'No'}
+      if (pending.length > 0) {
+        approvalQueueSection.classList.remove('hidden');
+        approvalTaskList.innerHTML = pending.map(t => `
+          <div class="admin-task-item">
+            <div>
+              <strong>${t.title}</strong> (${t.category})<br>
+              <span style="font-size:0.75rem; color: var(--text-muted);">Days: ${(t.days || []).join(', ')}</span>
+            </div>
+            <div class="admin-actions">
+              <button onclick="approveTask('${t.id}')" class="btn-success btn-small">Approve</button>
+              <button onclick="deleteTask('${t.id}')" class="btn-danger btn-small">Reject</button>
             </div>
           </div>
+        `).join('');
+      } else {
+        approvalQueueSection.classList.add('hidden');
+      }
+
+      const filtered = approved.filter(t => {
+        if (activeAdminFilter === 'all') return true;
+        return t.days && t.days.includes(activeAdminFilter);
+      });
+
+      if (filtered.length === 0) {
+        adminTaskList.innerHTML = `<p style="text-align: center; color: var(--text-muted);">No active tasks for this filter.</p>`;
+        return;
+      }
+
+      adminTaskList.innerHTML = filtered.map(t => `
+        <div class="admin-task-item">
+          <div>
+            <strong>${t.title}</strong> [${t.category}]
+            ${t.is_temporary ? '<span class="badge-temp">Today Only</span>' : ''}<br>
+            <span style="font-size:0.75rem; color: var(--text-muted);">
+              Days: ${(t.days || []).join(', ')} | Photo: ${t.requires_photo ? `Yes (Max ${t.max_photos || 1})` : 'No'} | Staff: ${t.requires_initials ? 'Yes' : 'No'}
+            </span>
+          </div>
           <div class="admin-actions">
-            <button onclick="editTask('${task.id}')" class="btn-secondary btn-small">Edit</button>
-            <button onclick="deleteTask('${task.id}')" class="btn-danger btn-small">Delete</button>
+            <button onclick="editTask('${t.id}')" class="btn-secondary btn-small">Edit</button>
+            <button onclick="deleteTask('${t.id}')" class="btn-danger btn-small">Delete</button>
           </div>
         </div>
       `).join('');
     }
 
-    window.handleTaskFormSubmit = async function(isTemporary = false) {
+    window.filterAdminTasks = function(filterDay, btnEl) {
+      activeAdminFilter = filterDay;
+      adminFilterTabs.forEach(t => t.classList.remove('active'));
+      btnEl.classList.add('active');
+      loadAdminTasks();
+    };
+
+    async function loadStaffPerformance(isSilent = false) {
+      const container = document.getElementById('modal-staff-performance-container');
+      if (!container) return;
+
+      if (!isSilent) container.innerHTML = `<p style="text-align: center; color: var(--text-muted);">Loading performance...</p>`;
+
+      const { data: completions, error } = await supabaseClient
+        .from('task_completions')
+        .select('initials');
+
+      if (error || !completions) {
+        container.innerHTML = `<p class="error-message">Could not load leaderboard data.</p>`;
+        return;
+      }
+
+      const counts = {};
+      completions.forEach(c => {
+        const names = parseInitials(c.initials);
+        names.forEach(name => {
+          counts[name] = (counts[name] || 0) + 1;
+        });
+      });
+
+      const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+
+      if (sorted.length === 0) {
+        container.innerHTML = `<p style="text-align: center; color: var(--text-muted);">No completions recorded yet.</p>`;
+        return;
+      }
+
+      const badges = ['🥇', '🥈', '🥉'];
+      container.innerHTML = sorted.map(([name, count], index) => `
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; margin-bottom: 6px; background: var(--bg-card-alt); border-radius: 8px; border-left: 4px solid ${index === 0 ? '#99C63E' : index === 1 ? '#FF509F' : '#8D2D91'};">
+          <span style="font-weight: 700; font-size: 0.95rem;">
+            ${badges[index] || `#${index + 1}`} ${name}
+          </span>
+          <span style="background: rgba(153, 198, 62, 0.2); color: var(--flipout-green); padding: 4px 10px; border-radius: 12px; font-weight: 800; font-size: 0.85rem;">
+            ${count} task${count > 1 ? 's' : ''}
+          </span>
+        </div>
+      `).join('');
+    }
+
+    async function handleTaskFormSubmit(isTemporary) {
       dismissKeyboard();
-      const titleInput = document.getElementById('new-task-title');
-      const categoryInput = document.getElementById('new-task-category');
-      const photosCountInput = document.getElementById('new-task-photos-count');
-      const photoCheck = document.getElementById('new-task-photo');
-      const initialsCheck = document.getElementById('new-task-initials');
+      const title = document.getElementById('new-task-title').value.trim();
+      const category = document.getElementById('new-task-category').value;
+      const maxPhotos = parseInt(document.getElementById('new-task-photos-count').value, 10);
+      const requiresPhoto = document.getElementById('new-task-photo').checked;
+      const requiresInitials = document.getElementById('new-task-initials').checked;
       const editingId = document.getElementById('editing-task-id').value;
 
-      const title = titleInput.value.trim();
       if (!title) {
         alert('Please enter a task description.');
         return;
       }
 
-      const selectedDays = [];
-      document.querySelectorAll('.day-check:checked').forEach(cb => selectedDays.push(cb.value));
+      const checkedDays = Array.from(document.querySelectorAll('.day-check:checked')).map(cb => cb.value);
 
-      if (!isTemporary && selectedDays.length === 0 && !editingId) {
-        alert('Please select at least one active day for permanent tasks.');
-        return;
-      }
-
-      const taskData = {
-        title: title,
-        category: categoryInput.value,
-        requires_photo: photoCheck.checked,
-        max_photos: parseInt(photosCountInput.value) || 1,
-        requires_initials: initialsCheck.checked,
-        days: isTemporary ? [currentSelectedDay] : selectedDays,
+      const taskPayload = {
+        title,
+        category,
+        max_photos: maxPhotos,
+        requires_photo: requiresPhoto,
+        requires_initials: requiresInitials,
+        days: isTemporary ? [currentSelectedDay] : checkedDays,
         is_temporary: isTemporary,
         created_for_date: isTemporary ? currentSelectedDateISO : null,
         is_approved: currentUserRole === 'admin' || isTemporary
@@ -2450,66 +2478,58 @@
       if (editingId) {
         const { error } = await supabaseClient
           .from('tasks')
-          .update(taskData)
+          .update(taskPayload)
           .eq('id', editingId);
 
-        if (error) {
-          alert('Error updating task: ' + error.message);
-        } else {
-          alert('✓ Task updated successfully.');
-          cancelEditTask();
-          loadAdminTasks();
-        }
+        if (error) alert('Error updating task: ' + error.message);
       } else {
         const { error } = await supabaseClient
           .from('tasks')
-          .insert([taskData]);
+          .insert([taskPayload]);
 
-        if (error) {
-          alert('Error adding task: ' + error.message);
-        } else {
-          alert(taskData.is_approved ? '✓ Task created successfully!' : '📩 Task submitted for admin approval.');
-          document.getElementById('task-form').reset();
-          document.getElementById('new-task-initials').checked = true;
-          loadAdminTasks();
-        }
+        if (error) alert('Error adding task: ' + error.message);
       }
-    };
 
-    window.editTask = async function(taskId) {
-      const { data: task, error } = await supabaseClient
-        .from('tasks')
-        .select('*')
-        .eq('id', taskId)
-        .single();
+      cancelEditTask();
+      loadAdminTasks();
+      selectDay(currentSelectedDay, true);
+    }
 
-      if (error || !task) {
-        alert('Could not load task details.');
-        return;
-      }
+    window.editTask = function(taskId) {
+      const task = allLoadedTasks.find(t => String(t.id) === String(taskId));
+      if (!task) return;
 
       document.getElementById('editing-task-id').value = task.id;
       document.getElementById('new-task-title').value = task.title;
       document.getElementById('new-task-category').value = task.category || 'Opening';
-      document.getElementById('new-task-photos-count').value = String(task.max_photos || 1);
+      document.getElementById('new-task-photos-count').value = task.max_photos || 1;
       document.getElementById('new-task-photo').checked = !!task.requires_photo;
       document.getElementById('new-task-initials').checked = !!task.requires_initials;
 
       document.querySelectorAll('.day-check').forEach(cb => {
-        cb.checked = (task.days || []).includes(cb.value);
+        cb.checked = task.days && task.days.includes(cb.value);
       });
 
       document.getElementById('form-heading').textContent = 'Edit Job';
       document.getElementById('cancel-edit-btn').classList.remove('hidden');
-      window.scrollTo({ top: document.getElementById('task-form').offsetTop, behavior: 'smooth' });
     };
 
     window.cancelEditTask = function() {
       document.getElementById('editing-task-id').value = '';
       document.getElementById('task-form').reset();
-      document.getElementById('new-task-initials').checked = true;
       document.getElementById('form-heading').textContent = 'Add Job';
       document.getElementById('cancel-edit-btn').classList.add('hidden');
+    };
+
+    window.approveTask = async function(taskId) {
+      const { error } = await supabaseClient
+        .from('tasks')
+        .update({ is_approved: true })
+        .eq('id', taskId);
+
+      if (error) alert('Error approving task: ' + error.message);
+      loadAdminTasks();
+      selectDay(currentSelectedDay, true);
     };
 
     window.deleteTask = async function(taskId) {
@@ -2520,126 +2540,39 @@
         .delete()
         .eq('id', taskId);
 
-      if (error) {
-        alert('Error deleting task: ' + error.message);
-      } else {
-        loadAdminTasks();
-      }
-    };
-
-    window.approveTask = async function(taskId) {
-      const { error } = await supabaseClient
-        .from('tasks')
-        .update({ is_approved: true })
-        .eq('id', taskId);
-
-      if (error) alert('Approval error: ' + error.message);
-      else loadAdminTasks();
-    };
-
-    window.rejectTask = async function(taskId) {
-      if (!confirm('Reject and delete this job request?')) return;
-      deleteTask(taskId);
-    };
-
-    window.filterAdminTasks = function(dayFilter, btnEl) {
-      activeAdminFilter = dayFilter;
-      adminFilterTabs.forEach(t => t.classList.remove('active'));
-      if (btnEl) btnEl.classList.add('active');
+      if (error) alert('Error deleting task: ' + error.message);
       loadAdminTasks();
-    };
-
-    async function loadStaffPerformance(isSilent = false) {
-      const container = document.getElementById('modal-staff-performance-container');
-      if (!container && !isSilent) return;
-
-      const mondayISO = getDateForDayOfWeek('monday');
-      const sundayISO = getDateForDayOfWeek('sunday');
-
-      const { data: completions, error } = await supabaseClient
-        .from('task_completions')
-        .select('initials, completed_date')
-        .gte('completed_date', mondayISO)
-        .lte('completed_date', sundayISO);
-
-      if (error) {
-        if (container) container.innerHTML = `<p class="error-message">Error loading leaderboard: ${error.message}</p>`;
-        return;
-      }
-
-      const tallyMap = new Map();
-      (completions || []).forEach(c => {
-        const names = parseInitials(c.initials);
-        names.forEach(name => {
-          tallyMap.set(name, (tallyMap.get(name) || 0) + 1);
-        });
-      });
-
-      const sorted = Array.from(tallyMap.entries()).sort((a, b) => b[1] - a[1]);
-
-      if (!container) return;
-
-      if (sorted.length === 0) {
-        container.innerHTML = `<p style="text-align: center; color: var(--text-muted); padding: 1rem;">No task completions recorded yet for this week.</p>`;
-        return;
-      }
-
-      const medals = ['🥇', '🥈', '🥉'];
-      container.innerHTML = sorted.map(([name, count], index) => {
-        const medal = index < 3 ? medals[index] : `#${index + 1}`;
-        return `
-          <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-card-alt); padding: 0.85rem 1rem; border-radius: 10px; margin-bottom: 0.5rem; border: 1px solid rgba(255,255,255,0.05);">
-            <div style="display: flex; align-items: center; gap: 10px;">
-              <span style="font-size: 1.2rem; font-weight: bold; width: 28px;">${medal}</span>
-              <strong style="color: #FFFFFF; font-size: 1rem;">${name}</strong>
-            </div>
-            <span style="background: rgba(153,198,62,0.2); color: var(--flipout-green); border: 1px solid var(--flipout-green); padding: 4px 10px; border-radius: 12px; font-weight: bold; font-size: 0.85rem;">
-              ${count} ${count === 1 ? 'task' : 'tasks'}
-            </span>
-          </div>
-        `;
-      }).join('');
-    }
-
-    window.sendEODSummaryEmail = async function(isAuto = false) {
-      dismissKeyboard();
-      showEODReportScreen();
+      selectDay(currentSelectedDay, true);
     };
 
     window.exportCompletionsToCSV = async function() {
-      dismissKeyboard();
-      const mondayISO = getDateForDayOfWeek('monday');
-      const sundayISO = getDateForDayOfWeek('sunday');
-
       const { data: completions, error } = await supabaseClient
         .from('task_completions')
-        .select('id, task_id, completed_date, initials, photo_url, created_at')
-        .gte('completed_date', mondayISO)
-        .lte('completed_date', sundayISO);
+        .select('*');
 
       if (error || !completions || completions.length === 0) {
-        alert('No completion records found to export for this week.');
+        alert('No completions available to export.');
         return;
       }
 
-      let csv = 'ID,Task ID,Date,Staff,Photo URLs,Submitted At\n';
+      let csvContent = 'data:text/csv;charset=utf-8,ID,Task ID,Date,Staff,Photo URL\n';
       completions.forEach(c => {
-        const photos = parsePhotoUrls(c.photo_url).join(' | ');
-        const safeInitials = `"${(c.initials || '').replace(/"/g, '""')}"`;
-        csv += `"${c.id}","${c.task_id}","${c.completed_date}",${safeInitials},"${photos}","${c.created_at}"\n`;
+        const safeInitials = (c.initials || '').replace(/"/g, '""');
+        const safePhoto = (c.photo_url || '').replace(/"/g, '""');
+        csvContent += `"${c.id}","${c.task_id}","${c.completed_date}","${safeInitials}","${safePhoto}"\n`;
       });
 
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
+      const encodedUri = encodeURI(csvContent);
       const link = document.createElement('a');
-      link.setAttribute('href', url);
-      link.setAttribute('download', `FlipOut_Completions_${mondayISO}_to_${sundayISO}.csv`);
+      link.setAttribute('href', encodedUri);
+      link.setAttribute('download', `FlipOut_Completions_${getMelbourneTodayISO()}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
     };
 
-    window.onload = initialiseApp;
+    // Initialise app when DOM is ready
+    document.addEventListener('DOMContentLoaded', initialiseApp);
   </script>
 </body>
 </html>

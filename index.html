@@ -2198,7 +2198,7 @@
 
       try {
         const { data: latestReport, error } = await supabaseClient
-          .from('eod_reports')
+          .from('eod_responses')
           .select('*')
           .order('created_at', { ascending: false })
           .limit(1)
@@ -2310,7 +2310,7 @@
 
       try {
         const { error: dbError } = await supabaseClient
-          .from('eod_reports')
+          .from('eod_responses')
           .insert([reportData]);
 
         if (dbError) {
@@ -2396,7 +2396,7 @@
         const { data: completions, error: compError } = await supabaseClient
           .from('task_completions')
           .select('*')
-          .eq('date', currentSelectedDateISO);
+          .eq('completed_date', currentSelectedDateISO);
 
         if (compError) throw compError;
 
@@ -2574,10 +2574,9 @@
             .from('task_completions')
             .insert([{
               task_id: taskId,
-              date: currentSelectedDateISO,
+              completed_date: currentSelectedDateISO,
               initials: initials,
-              photo_url: photos.length > 0 ? JSON.stringify(photos) : null,
-              completed_at: new Date().toISOString()
+              photo_url: photos.length > 0 ? JSON.stringify(photos) : null
             }]);
 
           if (error) throw error;
@@ -2594,7 +2593,7 @@
             .from('task_completions')
             .delete()
             .eq('task_id', taskId)
-            .eq('date', currentSelectedDateISO);
+            .eq('completed_date', currentSelectedDateISO);
 
           if (error) throw error;
 
@@ -2889,7 +2888,7 @@
           const title = c.tasks ? `"${c.tasks.title.replace(/"/g, '""')}"` : 'Unknown Task';
           const category = c.tasks ? `"${c.tasks.category.replace(/"/g, '""')}"` : 'General';
           const initials = `"${(c.initials || c.completed_by || '').replace(/"/g, '""')}"`;
-          csvContent += `${c.id},${c.date},${title},${category},${initials},${c.completed_at}\n`;
+          csvContent += `${c.id},${c.completed_date},${title},${category},${initials},${c.created_at}\n`;
         });
 
         const encodedUri = encodeURI(csvContent);

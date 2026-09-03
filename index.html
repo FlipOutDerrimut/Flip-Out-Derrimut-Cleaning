@@ -2204,38 +2204,33 @@
           .limit(1)
           .maybeSingle();
 
-        if (error || !latestReport) {
+        if (error) throw error;
+        if (!latestReport) {
           alert('No EOD report found in database. Please submit an EOD report first.');
           if (btn) btn.disabled = false;
           return;
         }
 
-        // answers comes back as a JS object already (jsonb column), but handle
-        // a string just in case it was ever inserted manually.
-        let answersObj = latestReport.answers;
-        if (typeof answersObj === 'string') {
-          try { answersObj = JSON.parse(answersObj); } catch (e) { answersObj = {}; }
-        }
-        answersObj = answersObj || {};
-        const cash = answersObj.cash || {};
-        const opQuestions = Array.isArray(answersObj.operational_questions) ? answersObj.operational_questions : [];
-        const questionAnswersStr = opQuestions.map(qa => `• ${qa.question}: ${qa.answer}`).join('\n');
-
         const templateParams = {
-          day: answersObj.day || '',
-          report_date: answersObj.date_display || latestReport.shift_date,
-          staff_members: latestReport.submitted_by,
-          rec1_float: cash.float || '$300.00',
-          rec1_takings: typeof cash.takings === 'number' ? cash.takings.toFixed(2) : cash.takings,
-          eod_takings: typeof cash.eod_takings === 'number' ? cash.eod_takings.toFixed(2) : cash.eod_takings,
-          total_cash: cash.total_cash,
-          eftpos_1: typeof cash.eftpos_1 === 'number' ? cash.eftpos_1.toFixed(2) : cash.eftpos_1,
-          eftpos_2: typeof cash.eftpos_2 === 'number' ? cash.eftpos_2.toFixed(2) : cash.eftpos_2,
-          total_eftpos: cash.total_eftpos,
-          online_booking: typeof cash.online_booking === 'number' ? cash.online_booking.toFixed(2) : cash.online_booking,
-          bank_transfer: typeof cash.bank_transfer === 'number' ? cash.bank_transfer.toFixed(2) : cash.bank_transfer,
-          grand_total: cash.grand_total,
-          operational_questions: questionAnswersStr
+          day: latestReport.day_name,
+          report_date: latestReport.shift_date,
+          staff_members: latestReport.staff_on_shift,
+          rec1_float: `$${Number(latestReport.float_amount || 0).toFixed(2)}`,
+          rec1_takings: Number(latestReport.takings || 0).toFixed(2),
+          eod_takings: Number(latestReport.eod_takings || 0).toFixed(2),
+          total_cash: `$${Number(latestReport.total_cash || 0).toFixed(2)}`,
+          eftpos_1: Number(latestReport.eftpos_1 || 0).toFixed(2),
+          eftpos_2: Number(latestReport.eftpos_2 || 0).toFixed(2),
+          total_eftpos: `$${Number(latestReport.total_eftpos || 0).toFixed(2)}`,
+          online_booking: Number(latestReport.online_booking || 0).toFixed(2),
+          bank_transfer: Number(latestReport.bank_transfer || 0).toFixed(2),
+          grand_total: `$${Number(latestReport.grand_total || 0).toFixed(2)}`,
+          enquiries_count: latestReport.enquiries_count,
+          parties_summary: latestReport.parties_summary,
+          schools_summary: latestReport.schools_summary,
+          flipx_summary: latestReport.flipx_summary,
+          ninjas_summary: latestReport.ninjas_summary,
+          house_party_summary: latestReport.house_party_summary
         };
 
         if (typeof emailjs !== 'undefined' && EMAILJS_PUBLIC_KEY !== 'YOUR_EMAILJS_PUBLIC_KEY') {
@@ -2265,74 +2260,54 @@
       msgDiv.textContent = 'Submitting End of Day Report...';
 
       const qState = currentEODQuestionsState;
-      const questionAnswers = [];
 
-      questionAnswers.push({
-        question: 'Question 1. How many enquiries did we receive (Fill in throughout the day)',
-        answer: `${qState.enquiries || 0}`
-      });
+      function summariseRows(rows) {
+        const filtered = (rows || []).filter(r => r.name.trim().length > 0 || r.count > 0);
+        if (filtered.length === 0) return 'None recorded';
+        return filtered.map(r => `${r.name || 'Unnamed'}: ${r.count || 0}`).join(' | ');
+      }
 
-      const workerQuestionTitles = {
-        parties: 'Question 2. How many Parties did you book today?',
-        schools: 'Question 3. How many Schools did you book today?',
-        flipx: 'Question 4. How many Flip-X did you Sign Up today?',
-        ninjas: 'Question 5. How many Ninja’s did you sign up today?',
-        houseParty: 'Question 6. How many House Party Admissions did you book today?'
-      };
-
-      Object.keys(workerQuestionTitles).forEach(key => {
-        const rows = (qState[key] || []).filter(r => r.name.trim().length > 0 || r.count > 0);
-        let summaryStr = 'None recorded';
-        if (rows.length > 0) {
-          summaryStr = rows.map(r => `${r.name || 'Unnamed'}: ${r.count || 0}`).join(' | ');
-        }
-        questionAnswers.push({
-          question: workerQuestionTitles[key],
-          answer: summaryStr
-        });
-      });
-
-      // eod_responses.parties_booked is a single integer column, so sum every
-      // staff member's party count from Question 2 into one total.
-      const totalPartiesBooked = (qState.parties || []).reduce(
-        (sum, r) => sum + (parseInt(r.count) || 0), 0
-      );
+      const partiesSummary = summariseRows(qState.parties);
+      const schoolsSummary = summariseRows(qState.schools);
+      const flipxSummary = summariseRows(qState.flipx);
+      const ninjasSummary = summariseRows(qState.ninjas);
+      const housePartySummary = summariseRows(qState.houseParty);
 
       const dayName = document.getElementById('eod-day').value;
       const dateDisplay = document.getElementById('eod-date').value;
       const shiftDateISO = getMelbourneTodayISO();
 
-      const cashSummary = {
-        float: '$300.00',
-        takings: parseFloat(document.getElementById('eod-takings-input').value) || 0,
-        eod_takings: parseFloat(document.getElementById('eod-eod-takings-input').value) || 0,
-        total_cash: document.getElementById('eod-total-cash-1').value,
-        eftpos_1: parseFloat(document.getElementById('eod-eftpos-1').value) || 0,
-        eftpos_2: parseFloat(document.getElementById('eod-eftpos-2').value) || 0,
-        total_eftpos: document.getElementById('eod-total-eftpos').value,
-        online_booking: parseFloat(document.getElementById('eod-online-booking').value) || 0,
-        bank_transfer: parseFloat(document.getElementById('eod-bank-transfer').value) || 0,
-        grand_total: document.getElementById('eod-grand-total-input').value
-      };
+      const takings = parseFloat(document.getElementById('eod-takings-input').value) || 0;
+      const eodTakings = parseFloat(document.getElementById('eod-eod-takings-input').value) || 0;
+      const eftpos1 = parseFloat(document.getElementById('eod-eftpos-1').value) || 0;
+      const eftpos2 = parseFloat(document.getElementById('eod-eftpos-2').value) || 0;
+      const onlineBooking = parseFloat(document.getElementById('eod-online-booking').value) || 0;
+      const bankTransfer = parseFloat(document.getElementById('eod-bank-transfer').value) || 0;
+      const totalCash = takings + eodTakings;
+      const totalEftpos = eftpos1 + eftpos2;
+      const grandTotal = totalCash + totalEftpos + onlineBooking + bankTransfer;
 
-      // Quick human-readable summary for the eod_notes column so the questions
-      // are visible at a glance directly in Supabase, without opening the JSON.
-      const eodNotesSummary = questionAnswers.map(qa => `${qa.question}: ${qa.answer}`).join(' | ');
-
-      // Matches the actual eod_responses columns: id, created_at, submitted_by,
-      // shift_date, answers (jsonb), notes, enquiries_count, parties_booked, eod_notes.
+      // Matches the rebuilt eod_responses table exactly - one plain column per value.
       const reportData = {
-        submitted_by: document.getElementById('eod-staff').value.trim(),
         shift_date: shiftDateISO,
+        day_name: dayName,
+        staff_on_shift: document.getElementById('eod-staff').value.trim(),
+        float_amount: 300.00,
+        takings: takings,
+        eod_takings: eodTakings,
+        total_cash: totalCash,
+        eftpos_1: eftpos1,
+        eftpos_2: eftpos2,
+        total_eftpos: totalEftpos,
+        online_booking: onlineBooking,
+        bank_transfer: bankTransfer,
+        grand_total: grandTotal,
         enquiries_count: qState.enquiries || 0,
-        parties_booked: totalPartiesBooked,
-        eod_notes: eodNotesSummary,
-        answers: {
-          day: dayName,
-          date_display: dateDisplay,
-          cash: cashSummary,
-          operational_questions: questionAnswers
-        }
+        parties_summary: partiesSummary,
+        schools_summary: schoolsSummary,
+        flipx_summary: flipxSummary,
+        ninjas_summary: ninjasSummary,
+        house_party_summary: housePartySummary
       };
 
       try {
@@ -2340,9 +2315,9 @@
           .from('eod_responses')
           .insert([reportData]);
 
-        if (dbError) {
-          console.warn('Supabase DB Note:', dbError.message);
-        }
+        // A failed save must never look like a success - surface it instead
+        // of the old console.warn-only behaviour.
+        if (dbError) throw dbError;
 
         const reportJsonString = JSON.stringify(reportData, null, 2);
         const jsonBlob = new Blob([reportJsonString], { type: 'application/json' });
@@ -2357,18 +2332,23 @@
           const templateParams = {
             day: dayName,
             report_date: dateDisplay,
-            staff_members: reportData.submitted_by,
-            rec1_float: cashSummary.float,
-            rec1_takings: cashSummary.takings.toFixed(2),
-            eod_takings: cashSummary.eod_takings.toFixed(2),
-            total_cash: cashSummary.total_cash,
-            eftpos_1: cashSummary.eftpos_1.toFixed(2),
-            eftpos_2: cashSummary.eftpos_2.toFixed(2),
-            total_eftpos: cashSummary.total_eftpos,
-            online_booking: cashSummary.online_booking.toFixed(2),
-            bank_transfer: cashSummary.bank_transfer.toFixed(2),
-            grand_total: cashSummary.grand_total,
-            operational_questions: questionAnswers.map(qa => `• ${qa.question}: ${qa.answer}`).join('\n')
+            staff_members: reportData.staff_on_shift,
+            rec1_float: `$${reportData.float_amount.toFixed(2)}`,
+            rec1_takings: takings.toFixed(2),
+            eod_takings: eodTakings.toFixed(2),
+            total_cash: `$${totalCash.toFixed(2)}`,
+            eftpos_1: eftpos1.toFixed(2),
+            eftpos_2: eftpos2.toFixed(2),
+            total_eftpos: `$${totalEftpos.toFixed(2)}`,
+            online_booking: onlineBooking.toFixed(2),
+            bank_transfer: bankTransfer.toFixed(2),
+            grand_total: `$${grandTotal.toFixed(2)}`,
+            enquiries_count: reportData.enquiries_count,
+            parties_summary: partiesSummary,
+            schools_summary: schoolsSummary,
+            flipx_summary: flipxSummary,
+            ninjas_summary: ninjasSummary,
+            house_party_summary: housePartySummary
           };
           await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_EOD_TEMPLATE_ID, templateParams, EMAILJS_PUBLIC_KEY);
         }

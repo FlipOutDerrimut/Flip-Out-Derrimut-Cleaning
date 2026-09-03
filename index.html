@@ -1771,6 +1771,91 @@
       return [];
     }
 
+    // Combines Q1-Q6 operational answers into the single text block the
+    // email template's {{eod_notes}} placeholder expects.
+    function buildEodNotesText({ enquiriesCount, partiesSummary, schoolsSummary, flipxSummary, ninjasSummary, housePartySummary }) {
+      return [
+        `Enquiries: ${enquiriesCount}`,
+        `Parties Booked: ${partiesSummary}`,
+        `Schools Booked: ${schoolsSummary}`,
+        `Flip-X Sign Ups: ${flipxSummary}`,
+        `Ninjas Sign Ups: ${ninjasSummary}`,
+        `House Party Admissions: ${housePartySummary}`
+      ].join('\n');
+    }
+
+    // Pulls checklist completion data for a given date so the EOD email's
+    // completion-rate, completed-items and photo sections are actually filled in.
+    async function buildChecklistSummaryForDate(dateISO) {
+      try {
+        const { data: tasks, error: taskError } = await supabaseClient
+          .from('tasks')
+          .select('*');
+        if (taskError) throw taskError;
+
+        const { data: completions, error: compError } = await supabaseClient
+          .from('task_completions')
+          .select('*')
+          .eq('completed_date', dateISO);
+        if (compError) throw compError;
+
+        const dateObj = new Date(dateISO + 'T00:00:00');
+        const dayNameForDate = dateObj.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+
+        const dayTasks = (tasks || []).filter(task => {
+          if (task.status === 'pending_approval') return false;
+          if (task.is_temporary) {
+            return task.temp_date === dateISO;
+          }
+          if (Array.isArray(task.days)) {
+            return task.days.includes(dayNameForDate);
+          } else if (typeof task.days === 'string') {
+            return task.days.toLowerCase().includes(dayNameForDate);
+          }
+          return true;
+        });
+
+        const completionMap = {};
+        (completions || []).forEach(c => { completionMap[c.task_id] = c; });
+
+        const totalCount = dayTasks.length;
+        let completedCount = 0;
+        const summaryLines = [];
+        const photoLines = [];
+
+        dayTasks.forEach(task => {
+          const comp = completionMap[task.id];
+          if (comp) {
+            completedCount++;
+            const who = comp.initials || 'Unknown';
+            summaryLines.push(`✓ ${task.title} — ${who}`);
+
+            const photos = parsePhotoUrls(comp.photo_url);
+            photos.forEach((url, idx) => {
+              photoLines.push(`<div style="margin-bottom:8px;"><a href="${url}" target="_blank" style="color:#FF509F;">${escapeHtml(task.title)} - Photo ${idx + 1}</a></div>`);
+            });
+          } else {
+            summaryLines.push(`✗ ${task.title} — Not completed`);
+          }
+        });
+
+        const completionRate = totalCount > 0 ? `${Math.round((completedCount / totalCount) * 100)}%` : 'N/A';
+        const summaryDetails = summaryLines.length > 0 ? summaryLines.join('\n') : 'No tasks recorded for this date.';
+        const photoGallery = photoLines.length > 0 ? photoLines.join('') : '<em>No photos submitted.</em>';
+
+        return { completionRate, completedCount, totalCount, summaryDetails, photoGallery };
+      } catch (err) {
+        console.error('Failed to build checklist summary for EOD email:', err);
+        return {
+          completionRate: 'N/A',
+          completedCount: 0,
+          totalCount: 0,
+          summaryDetails: 'Unable to load checklist data.',
+          photoGallery: ''
+        };
+      }
+    }
+
     const messageComponents = {
       openers: [
         "Legendary work!", "Flip-tastic job!", "Unreal effort!", "Boom!", "Sensational effort!",
@@ -2211,26 +2296,37 @@
           return;
         }
 
+        const checklistSummary = await buildChecklistSummaryForDate(latestReport.shift_date);
+        const eodNotesText = buildEodNotesText({
+          enquiriesCount: latestReport.enquiries_count,
+          partiesSummary: latestReport.parties_summary,
+          schoolsSummary: latestReport.schools_summary,
+          flipxSummary: latestReport.flipx_summary,
+          ninjasSummary: latestReport.ninjas_summary,
+          housePartySummary: latestReport.house_party_summary
+        });
+
         const templateParams = {
           day: latestReport.day_name,
           report_date: latestReport.shift_date,
           staff_members: latestReport.staff_on_shift,
           rec1_float: `$${Number(latestReport.float_amount || 0).toFixed(2)}`,
           rec1_takings: Number(latestReport.takings || 0).toFixed(2),
-          eod_takings: Number(latestReport.eod_takings || 0).toFixed(2),
-          total_cash: `$${Number(latestReport.total_cash || 0).toFixed(2)}`,
-          eftpos_1: Number(latestReport.eftpos_1 || 0).toFixed(2),
-          eftpos_2: Number(latestReport.eftpos_2 || 0).toFixed(2),
+          rec1_eod_takings: Number(latestReport.eod_takings || 0).toFixed(2),
+          rec1_total_cash: `$${Number(latestReport.total_cash || 0).toFixed(2)}`,
+          rec1_eftpos: Number(latestReport.eftpos_1 || 0).toFixed(2),
+          rec2_eftpos: Number(latestReport.eftpos_2 || 0).toFixed(2),
           total_eftpos: `$${Number(latestReport.total_eftpos || 0).toFixed(2)}`,
+          total_cash: `$${Number(latestReport.total_cash || 0).toFixed(2)}`,
           online_booking: Number(latestReport.online_booking || 0).toFixed(2),
           bank_transfer: Number(latestReport.bank_transfer || 0).toFixed(2),
           grand_total: `$${Number(latestReport.grand_total || 0).toFixed(2)}`,
-          enquiries_count: latestReport.enquiries_count,
-          parties_summary: latestReport.parties_summary,
-          schools_summary: latestReport.schools_summary,
-          flipx_summary: latestReport.flipx_summary,
-          ninjas_summary: latestReport.ninjas_summary,
-          house_party_summary: latestReport.house_party_summary
+          eod_notes: eodNotesText,
+          completion_rate: checklistSummary.completionRate,
+          completed_count: checklistSummary.completedCount,
+          total_count: checklistSummary.totalCount,
+          summary_details: checklistSummary.summaryDetails,
+          photo_gallery: checklistSummary.photoGallery
         };
 
         if (typeof emailjs !== 'undefined' && EMAILJS_PUBLIC_KEY !== 'YOUR_EMAILJS_PUBLIC_KEY') {
@@ -2329,26 +2425,37 @@
           .upload(storageFilePath, jsonBlob);
 
         if (typeof emailjs !== 'undefined' && EMAILJS_PUBLIC_KEY !== 'YOUR_EMAILJS_PUBLIC_KEY') {
+          const checklistSummary = await buildChecklistSummaryForDate(shiftDateISO);
+          const eodNotesText = buildEodNotesText({
+            enquiriesCount: reportData.enquiries_count,
+            partiesSummary,
+            schoolsSummary,
+            flipxSummary,
+            ninjasSummary,
+            housePartySummary
+          });
+
           const templateParams = {
             day: dayName,
             report_date: dateDisplay,
             staff_members: reportData.staff_on_shift,
             rec1_float: `$${reportData.float_amount.toFixed(2)}`,
             rec1_takings: takings.toFixed(2),
-            eod_takings: eodTakings.toFixed(2),
-            total_cash: `$${totalCash.toFixed(2)}`,
-            eftpos_1: eftpos1.toFixed(2),
-            eftpos_2: eftpos2.toFixed(2),
+            rec1_eod_takings: eodTakings.toFixed(2),
+            rec1_total_cash: `$${totalCash.toFixed(2)}`,
+            rec1_eftpos: eftpos1.toFixed(2),
+            rec2_eftpos: eftpos2.toFixed(2),
             total_eftpos: `$${totalEftpos.toFixed(2)}`,
+            total_cash: `$${totalCash.toFixed(2)}`,
             online_booking: onlineBooking.toFixed(2),
             bank_transfer: bankTransfer.toFixed(2),
             grand_total: `$${grandTotal.toFixed(2)}`,
-            enquiries_count: reportData.enquiries_count,
-            parties_summary: partiesSummary,
-            schools_summary: schoolsSummary,
-            flipx_summary: flipxSummary,
-            ninjas_summary: ninjasSummary,
-            house_party_summary: housePartySummary
+            eod_notes: eodNotesText,
+            completion_rate: checklistSummary.completionRate,
+            completed_count: checklistSummary.completedCount,
+            total_count: checklistSummary.totalCount,
+            summary_details: checklistSummary.summaryDetails,
+            photo_gallery: checklistSummary.photoGallery
           };
           await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_EOD_TEMPLATE_ID, templateParams, EMAILJS_PUBLIC_KEY);
         }

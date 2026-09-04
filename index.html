@@ -2,33 +2,26 @@
 <html lang="en-AU">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Flip Out Derrimut - Daily Checklists & EOD Portal</title>
 
-  <!-- Universal Favicon for Safari, Arc, Chrome & Edge (Mac/Windows) -->
   <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/FlipOutDerrimut/Flip-Out-Derrimut-Cleaning/06b339e89ffad0265b4e1e95d55feeda43969e17/FO%20Icon%20-%20Green.png">
   <link rel="apple-touch-icon" href="https://raw.githubusercontent.com/FlipOutDerrimut/Flip-Out-Derrimut-Cleaning/06b339e89ffad0265b4e1e95d55feeda43969e17/FO%20Icon%20-%20Green.png">
   
-  <!-- iPad Kiosk & PWA Meta Tags -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Flip Out Clean">
 
-  <!-- Google Fonts: Unbounded & Inter -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-  <!-- Supabase JS Client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- EmailJS Client for Admin Notifications -->
   <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
-  <!-- Canvas Confetti CDN -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
   <style>
     :root {
-      /* Official Flip Out Brand Colours */
       --flipout-green: #99C63E;
       --flipout-pink: #FF509F;
       --flipout-purple: #8D2D91;
@@ -46,6 +39,7 @@
     * {
       box-sizing: border-box;
       font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      -webkit-tap-highlight-color: transparent;
     }
 
     h1, h2, h3, h4, .brand-title, .checklist-title, .day-tab, .eod-header-title {
@@ -64,9 +58,22 @@
       flex-direction: column;
       align-items: center;
       min-height: 100vh;
+      overscroll-behavior: none;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
     }
 
-    /* Container Gradient Border Fix */
+    input, select, textarea {
+      -webkit-user-select: text;
+      user-select: text;
+      -webkit-touch-callout: default;
+    }
+
+    button, .day-tab, .top-nav-btn, .task-checkbox {
+      touch-action: manipulation;
+    }
+
     .container {
       width: 100%;
       max-width: 760px;
@@ -80,7 +87,6 @@
       overflow: hidden;
     }
 
-    /* Top Left Navigation Actions */
     .top-left-actions {
       position: absolute;
       top: 15px;
@@ -91,7 +97,6 @@
       z-index: 20;
     }
 
-    /* Top Right Navigation Actions */
     .top-right-actions {
       position: absolute;
       top: 15px;
@@ -230,7 +235,7 @@
     .day-tab {
       flex: 1;
       min-width: 62px;
-      padding: 0.7rem 0.4rem;
+      padding: 0.85rem 0.4rem;
       background: var(--bg-card-alt);
       border: 1px solid rgba(255, 255, 255, 0.1);
       border-radius: 10px;
@@ -241,6 +246,7 @@
       cursor: pointer;
       transition: all 0.25s ease;
       text-transform: uppercase;
+      touch-action: manipulation;
     }
 
     .day-tab.active {
@@ -295,11 +301,12 @@
     }
 
     .task-checkbox {
-      width: 24px;
-      height: 24px;
+      width: 32px;
+      height: 32px;
       margin-top: 2px;
       accent-color: var(--flipout-pink);
       cursor: pointer;
+      touch-action: manipulation;
     }
 
     .task-label {
@@ -329,7 +336,7 @@
       border: 1px solid var(--flipout-pink);
       background: var(--bg-input);
       color: #fff;
-      font-size: 0.85rem;
+      font-size: 16px;
       font-weight: 600;
     }
 
@@ -384,7 +391,6 @@
       letter-spacing: 0.5px;
     }
 
-    /* EOD REPORT FORM STYLING */
     .eod-card {
       background: var(--bg-card-alt);
       border-radius: 14px;
@@ -448,7 +454,6 @@
       text-align: right;
     }
 
-    /* COUNTER & WORKER ROW STYLING FOR OPERATIONAL QUESTIONS */
     .eod-q-box {
       background: var(--bg-input);
       padding: 1rem;
@@ -541,7 +546,6 @@
       color: var(--flipout-velvet);
     }
 
-    /* CASH CALCULATOR TABLE STYLING */
     .cash-calc-table-container {
       width: 100%;
       overflow-x: auto;
@@ -717,7 +721,8 @@
       border: 1px solid rgba(255, 80, 159, 0.3);
       background: var(--bg-input);
       color: #fff;
-      font-size: 0.95rem;
+      font-size: 16px;
+      touch-action: manipulation;
     }
 
     input:focus, select:focus, textarea:focus {
@@ -890,7 +895,6 @@
 </head>
 <body>
 
-  <!-- 1. STAFF CHECKLIST VIEW -->
   <div id="main-app" class="container">
     <div class="top-left-actions">
       <button id="show-admin-login-btn" onclick="showAdminLoginScreen()" class="top-nav-btn">🔑 Back Office Access</button>
@@ -948,7 +952,6 @@
     </div>
   </div>
 
-  <!-- 2. END OF DAY REPORT FORM VIEW -->
   <div id="eod-report-screen" class="container hidden">
     <div class="top-left-actions">
       <button onclick="showMainApp()" class="top-nav-btn">← Return to Portal</button>
@@ -964,8 +967,12 @@
       <div class="sub-title" style="color: var(--flipout-pink); font-size: 0.85rem;">FLIPOUT DERRIMUT</div>
     </div>
 
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:1rem; padding:0.6rem 0.9rem; background: var(--bg-input); border-radius:10px; border:1px solid rgba(153,198,62,0.3);">
+      <span id="eod-sync-indicator" style="font-size:0.8rem; font-weight:600; color: var(--flipout-green); min-height:1em;">This form auto-saves as you type - everyone on shift sees the same live copy.</span>
+      <button type="button" onclick="manualSaveEODDraft()" class="btn-secondary btn-eod-highlight" style="white-space:nowrap; font-size:0.8rem; padding:0.55rem 1rem; flex-shrink:0;">💾 Save Now</button>
+    </div>
+
     <form id="eod-takings-form">
-      <!-- GENERAL INFORMATION & WORKER MANAGEMENT SECTION -->
       <div class="eod-card eod-card-green">
         <div class="eod-grid-2">
           <div class="form-group">
@@ -978,7 +985,6 @@
           </div>
         </div>
         
-        <!-- DYNAMIC WORKER ADD/REMOVE MANAGER -->
         <div class="form-group" style="margin-bottom: 0;">
           <label>Staff On Shift Today:</label>
           <div style="display: flex; gap: 8px; margin-bottom: 8px;">
@@ -990,7 +996,6 @@
         </div>
       </div>
 
-      <!-- RECEPTION 1 / CASH TAKINGS SECTION -->
       <div class="eod-card">
         <div class="eod-section-title">💵 Cash Totals </div>
         <div class="eod-grid-2">
@@ -1013,7 +1018,6 @@
         </div>
       </div>
 
-      <!-- EFTPOS STATEMENT SECTION -->
       <div class="eod-card">
         <div class="eod-section-title">💳 Eftpos Statement</div>
         <div class="eod-grid-2">
@@ -1032,7 +1036,6 @@
         </div>
       </div>
 
-      <!-- TOTALS SUMMARY SECTION -->
       <div class="eod-card eod-card-green">
         <div class="eod-section-title">📊 Totals</div>
         <div class="eod-grid-2">
@@ -1059,7 +1062,6 @@
         </div>
       </div>
 
-      <!-- DYNAMIC OPERATIONAL QUESTIONS WITH AUTO-SAVE COUNTERS -->
       <div class="eod-card" id="eod-questions-card">
         <div class="eod-section-title">❓ End of Day Operational Questions</div>
         <div id="eod-questions-container">
@@ -1076,7 +1078,6 @@
     </div>
   </div>
 
-  <!-- 3. CASH CALCULATOR VIEW -->
   <div id="cash-calculator-screen" class="container hidden">
     <div class="top-left-actions">
       <button onclick="showEODReportScreen()" class="top-nav-btn">← Return to EOD Report</button>
@@ -1177,7 +1178,6 @@
     </div>
   </div>
 
-  <!-- 4. ADMIN & WORKER LOGIN SCREEN -->
   <div id="admin-login-screen" class="container hidden">
     <div class="brand-header">
       <img src="FO Derrimut-01.png" alt="Flip Out Derrimut Logo" class="brand-logo" style="max-width: 180px;">
@@ -1209,7 +1209,6 @@
     </div>
   </div>
 
-  <!-- 5. BACK OFFICE SCREEN -->
   <div id="back-office-screen" class="container hidden">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 1rem;">
       <div style="display: flex; align-items: center; gap: 12px;">
@@ -1239,7 +1238,6 @@
       <div id="approval-task-list"></div>
     </div>
 
-    <!-- ADMIN USER MANAGEMENT PANEL -->
     <div class="admin-only hidden" style="margin-bottom: 2rem; background: var(--bg-card-alt); padding: 1.25rem; border-radius: 12px; border: 1px solid rgba(255,80,159,0.3);">
       <h3 style="margin-top: 0; color: var(--flipout-pink); font-size: 1rem;">👤 Account Management & Worker Password Reset</h3>
       
@@ -1272,7 +1270,6 @@
       </div>
     </div>
 
-    <!-- WORKER SELF PASSWORD RESET PANEL -->
     <div id="worker-self-account-section" style="margin-bottom: 2rem; background: var(--bg-card-alt); padding: 1.25rem; border-radius: 12px; border: 1px solid rgba(153,198,62,0.3);">
       <h3 style="margin-top: 0; color: var(--flipout-green); font-size: 1rem;">🔐 Change My Password</h3>
       <form id="change-my-password-form">
@@ -1290,7 +1287,6 @@
       </form>
     </div>
 
-    <!-- TASK FORM -->
     <form id="task-form" style="margin-bottom: 2rem; background: var(--bg-input); padding: 1.25rem; border-radius: 12px; border: 1px solid rgba(153,198,62,0.2);">
       <input type="hidden" id="editing-task-id" value="" />
       <h3 id="form-heading" style="margin-top: 0; color: var(--flipout-green); font-size: 1.1rem;">Add Job</h3>
@@ -1377,7 +1373,6 @@
     </div>
   </div>
 
-  <!-- 6. LEADERBOARD POPUP MODAL -->
   <div id="leaderboard-modal" class="reward-modal-overlay hidden">
     <div class="reward-modal-card" style="max-width: 520px; text-align: left;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.75rem;">
@@ -1395,7 +1390,6 @@
     </div>
   </div>
 
-  <!-- 7. MOTIVATIONAL REWARD MODAL -->
   <div id="reward-modal" class="reward-modal-overlay hidden">
     <div class="reward-modal-card">
       <div class="reward-icon">🎉</div>
@@ -1406,12 +1400,10 @@
   </div>
 
   <script>
-    // Initialise Supabase Client
     const SUPABASE_URL = 'https://rtgmpmmcplxwezsleclj.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_PxJuEvkUbVmqNlcq-E2sPg_VBn5vI3F';
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // EmailJS Configuration
     const EMAILJS_PUBLIC_KEY = 'kxng6zTg7LBwLYGBU'; 
     const EMAILJS_SERVICE_ID = 'service_0alkyrv';
     const EMAILJS_TEMPLATE_ID = 'template_ehvz1nm';
@@ -1424,7 +1416,6 @@
     const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
     const stagedPhotos = {}; // task_id -> Array of uploaded Supabase URLs
     
-    // MELBOURNE TIME ZONE HELPER FUNCTIONS
     function getMelbourneTodayISO() {
       return new Date().toLocaleDateString('en-CA', { timeZone: 'Australia/Melbourne' });
     }
@@ -1433,7 +1424,6 @@
       return new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Australia/Melbourne' }).toLowerCase();
     }
 
-    // STRICT MONDAY-TO-SUNDAY OPERATING WEEK DATE CALCULATOR
     function getDateForDayOfWeek(dayName) {
       const dayMap = { 'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3, 'friday': 4, 'saturday': 5, 'sunday': 6 };
       const targetOffset = dayMap[dayName.toLowerCase()];
@@ -1458,7 +1448,6 @@
       return `${y}-${m}-${d}`;
     }
 
-    // WORKERS MANAGEMENT FOR THE DAY
     let workersToday = [];
 
     window.addWorkerForDay = function() {
@@ -1477,6 +1466,7 @@
       if (!workersToday.includes(formattedName)) {
         workersToday.push(formattedName);
         renderWorkersList();
+        saveEODDraft();
       }
       input.value = '';
     };
@@ -1484,6 +1474,7 @@
     window.removeWorkerForDay = function(index) {
       workersToday.splice(index, 1);
       renderWorkersList();
+      saveEODDraft();
     };
 
     function renderWorkersList() {
@@ -1505,7 +1496,6 @@
       }
     }
 
-    // SMART FIRST NAME & LAST INITIAL PARSER & NORMALISER
     function parseInitials(raw) {
       if (!raw) return [];
       let input = raw.trim().toUpperCase();
@@ -1621,7 +1611,6 @@
         .replace(/'/g, '&#039;');
     }
 
-    // DOM Elements
     const mainApp = document.getElementById('main-app');
     const eodReportScreen = document.getElementById('eod-report-screen');
     const cashCalculatorScreen = document.getElementById('cash-calculator-screen');
@@ -1636,7 +1625,6 @@
     const mainDayTabs = document.querySelectorAll('.main-day-tab');
     const adminFilterTabs = document.querySelectorAll('.admin-filter-tab');
 
-    // Navigation View Switchers
     window.showMainApp = function() {
       mainApp.classList.remove('hidden');
       eodReportScreen.classList.add('hidden');
@@ -1688,7 +1676,6 @@
       loadStaffPerformance();
     };
 
-    // LEADERBOARD MODAL CONTROLLERS
     window.openLeaderboardModal = function() {
       const modal = document.getElementById('leaderboard-modal');
       if (modal) {
@@ -1771,8 +1758,6 @@
       return [];
     }
 
-    // Combines Q1-Q6 operational answers into the single text block the
-    // email template's {{eod_notes}} placeholder expects.
     function buildEodNotesText({ enquiriesCount, partiesSummary, schoolsSummary, flipxSummary, ninjasSummary, housePartySummary }) {
       return [
         `Enquiries: ${enquiriesCount}`,
@@ -1784,8 +1769,6 @@
       ].join('\n');
     }
 
-    // Pulls checklist completion data for a given date so the EOD email's
-    // completion-rate, completed-items and photo sections are actually filled in.
     async function buildChecklistSummaryForDate(dateISO) {
       try {
         const { data: tasks, error: taskError } = await supabaseClient
@@ -2033,7 +2016,6 @@
       showMainApp();
     };
 
-    // CASH CALCULATOR LOGIC
     window.updateCashCalculator = function() {
       const qtyInputs = document.querySelectorAll('.calc-qty');
       let grandTotal = 0;
@@ -2092,7 +2074,10 @@
       inputs.forEach(id => {
         const el = document.getElementById(id);
         if (el) {
-          el.addEventListener('input', calculateEODTotals);
+          el.addEventListener('input', () => {
+            calculateEODTotals();
+            saveEODDraft();
+          });
         }
       });
 
@@ -2126,13 +2111,6 @@
       document.getElementById('eod-grand-total-input').value = `$${grandTotal.toFixed(2)}`;
     }
 
-    // STATEFUL EOD QUESTIONS MANAGER WITH INSTANT PERSISTENCE
-    const EOD_STORAGE_KEY_PREFIX = 'flipout_eod_questions_state_';
-
-    function getEODQuestionsStateKey() {
-      return EOD_STORAGE_KEY_PREFIX + getMelbourneTodayISO();
-    }
-
     function getInitialEODQuestionsState() {
       return {
         enquiries: 0,
@@ -2144,31 +2122,98 @@
       };
     }
 
-    function loadEODQuestionsState() {
-      try {
-        const saved = localStorage.getItem(getEODQuestionsStateKey());
-        if (saved) return JSON.parse(saved);
-      } catch (e) {
-        console.error('Failed to parse saved EOD questions state', e);
-      }
-      return getInitialEODQuestionsState();
+    function normaliseEODProgressRow(row) {
+      if (!row) return getInitialEODQuestionsState();
+      return {
+        enquiries: row.enquiries || 0,
+        parties: (row.parties && row.parties.length) ? row.parties : [{ name: '', count: 0 }],
+        schools: (row.schools && row.schools.length) ? row.schools : [{ name: '', count: 0 }],
+        flipx: (row.flipx && row.flipx.length) ? row.flipx : [{ name: '', count: 0 }],
+        ninjas: (row.ninjas && row.ninjas.length) ? row.ninjas : [{ name: '', count: 0 }],
+        houseParty: (row.house_party && row.house_party.length) ? row.house_party : [{ name: '', count: 0 }]
+      };
     }
 
-    function saveEODQuestionsState(state) {
-      try {
-        localStorage.setItem(getEODQuestionsStateKey(), JSON.stringify(state));
-      } catch (e) {
-        console.error('Failed to save EOD questions state', e);
+    async function loadEODLiveDraft(dateISO) {
+      const { data, error } = await supabaseClient
+        .from('eod_live_progress')
+        .select('*')
+        .eq('shift_date', dateISO)
+        .maybeSingle();
+
+      if (error) console.error('Failed to load EOD live draft', error);
+      return data || null;
+    }
+
+    function buildEODDraftPayload(dateISO) {
+      const numVal = (id) => parseFloat(document.getElementById(id)?.value) || 0;
+      return {
+        shift_date: dateISO,
+        staff_on_shift: workersToday.join(', '),
+        takings: numVal('eod-takings-input'),
+        eod_takings: numVal('eod-eod-takings-input'),
+        eftpos_1: numVal('eod-eftpos-1'),
+        eftpos_2: numVal('eod-eftpos-2'),
+        online_booking: numVal('eod-online-booking'),
+        bank_transfer: numVal('eod-bank-transfer'),
+        enquiries: currentEODQuestionsState.enquiries || 0,
+        parties: currentEODQuestionsState.parties,
+        schools: currentEODQuestionsState.schools,
+        flipx: currentEODQuestionsState.flipx,
+        ninjas: currentEODQuestionsState.ninjas,
+        house_party: currentEODQuestionsState.houseParty,
+        updated_at: new Date().toISOString()
+      };
+    }
+
+    let saveEODProgressTimer = null;
+    function saveEODDraft(immediate = false) {
+      clearTimeout(saveEODProgressTimer);
+      const indicator = document.getElementById('eod-sync-indicator');
+      if (indicator) indicator.textContent = 'Saving…';
+
+      const run = async () => {
+        const dateISO = getMelbourneTodayISO();
+        const { error } = await supabaseClient
+          .from('eod_live_progress')
+          .upsert([buildEODDraftPayload(dateISO)], { onConflict: 'shift_date' });
+
+        if (indicator) {
+          indicator.textContent = error ? 'Sync failed - check connection' : 'Saved ✓';
+          if (!error) {
+            setTimeout(() => {
+              if (indicator.textContent === 'Saved ✓') {
+                indicator.textContent = 'This form auto-saves as you type - everyone on shift sees the same live copy.';
+              }
+            }, 2000);
+          }
+        }
+      };
+
+      if (immediate) {
+        run();
+      } else {
+        saveEODProgressTimer = setTimeout(run, 400);
       }
     }
+
+    window.manualSaveEODDraft = function() {
+      saveEODDraft(true);
+    };
 
     let currentEODQuestionsState = getInitialEODQuestionsState();
+    let eodProgressChannel = null;
+    let eodProgressUpdatePending = false;
 
-    function renderEODOperationalQuestions() {
+    function isTypingInEODForm() {
+      const form = document.getElementById('eod-takings-form');
+      const active = document.activeElement;
+      return !!(form && active && form.contains(active));
+    }
+
+    function renderEODOperationalQuestionsUI() {
       const container = document.getElementById('eod-questions-container');
       if (!container) return;
-
-      currentEODQuestionsState = loadEODQuestionsState();
       const state = currentEODQuestionsState;
 
       let html = `
@@ -2216,13 +2261,77 @@
       container.innerHTML = html;
     }
 
+    function applyEODDraftToForm(row) {
+      workersToday = row && row.staff_on_shift
+        ? row.staff_on_shift.split(',').map(s => s.trim()).filter(Boolean)
+        : [];
+      renderWorkersList();
+
+      const setVal = (id, num) => {
+        const el = document.getElementById(id);
+        if (el) el.value = Number(num || 0).toFixed(2);
+      };
+      setVal('eod-takings-input', row?.takings);
+      setVal('eod-eod-takings-input', row?.eod_takings);
+      setVal('eod-eftpos-1', row?.eftpos_1);
+      setVal('eod-eftpos-2', row?.eftpos_2);
+      setVal('eod-online-booking', row?.online_booking);
+      setVal('eod-bank-transfer', row?.bank_transfer);
+      calculateEODTotals();
+
+      currentEODQuestionsState = normaliseEODProgressRow(row);
+      renderEODOperationalQuestionsUI();
+    }
+
+    function setupEODProgressRealtimeSubscription(dateISO) {
+      if (eodProgressChannel) {
+        supabaseClient.removeChannel(eodProgressChannel);
+        eodProgressChannel = null;
+      }
+
+      eodProgressChannel = supabaseClient
+        .channel(`eod-progress-${dateISO}`)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'eod_live_progress',
+          filter: `shift_date=eq.${dateISO}`
+        }, (payload) => {
+          if (isTypingInEODForm()) {
+            eodProgressUpdatePending = payload.new || true;
+          } else {
+            applyEODDraftToForm(payload.new);
+          }
+        })
+        .subscribe();
+    }
+
+    document.addEventListener('focusout', (e) => {
+      const form = document.getElementById('eod-takings-form');
+      if (!form || !form.contains(e.target)) return;
+      setTimeout(() => {
+        if (eodProgressUpdatePending && !isTypingInEODForm()) {
+          const pendingRow = (eodProgressUpdatePending === true) ? null : eodProgressUpdatePending;
+          eodProgressUpdatePending = false;
+          if (pendingRow) applyEODDraftToForm(pendingRow);
+        }
+      }, 150);
+    });
+
+    async function initEODLiveDraft() {
+      const dateISO = getMelbourneTodayISO();
+      const row = await loadEODLiveDraft(dateISO);
+      applyEODDraftToForm(row);
+      setupEODProgressRealtimeSubscription(dateISO);
+    }
+
     window.updateQ1Enquiries = function(delta, exactVal) {
       if (exactVal !== undefined) {
         currentEODQuestionsState.enquiries = Math.max(0, parseInt(exactVal) || 0);
       } else {
         currentEODQuestionsState.enquiries = Math.max(0, (currentEODQuestionsState.enquiries || 0) + delta);
       }
-      saveEODQuestionsState(currentEODQuestionsState);
+      saveEODDraft();
       const input = document.getElementById('q1-enquiries-val');
       if (input) input.value = currentEODQuestionsState.enquiries;
     };
@@ -2232,8 +2341,8 @@
       let val = currentEODQuestionsState[key][idx].count || 0;
       val = Math.max(0, val + delta);
       currentEODQuestionsState[key][idx].count = val;
-      saveEODQuestionsState(currentEODQuestionsState);
-      renderEODOperationalQuestions();
+      saveEODDraft();
+      renderEODOperationalQuestionsUI();
     };
 
     window.updateWorkerQuestionRow = function(key, idx, field, val) {
@@ -2243,14 +2352,14 @@
       } else {
         currentEODQuestionsState[key][idx][field] = val;
       }
-      saveEODQuestionsState(currentEODQuestionsState);
+      saveEODDraft();
     };
 
     window.addWorkerQuestionRow = function(key) {
       if (!currentEODQuestionsState[key]) currentEODQuestionsState[key] = [];
       currentEODQuestionsState[key].push({ name: '', count: 0 });
-      saveEODQuestionsState(currentEODQuestionsState);
-      renderEODOperationalQuestions();
+      saveEODDraft();
+      renderEODOperationalQuestionsUI();
     };
 
     window.removeWorkerQuestionRow = function(key, idx) {
@@ -2259,11 +2368,11 @@
       if (currentEODQuestionsState[key].length === 0) {
         currentEODQuestionsState[key].push({ name: '', count: 0 });
       }
-      saveEODQuestionsState(currentEODQuestionsState);
-      renderEODOperationalQuestions();
+      saveEODDraft();
+      renderEODOperationalQuestionsUI();
     };
 
-    function populateEODReportFields() {
+    async function populateEODReportFields() {
       const melbDateISO = getMelbourneTodayISO();
       const [year, month, day] = melbDateISO.split('-');
       const formattedDate = `${day}/${month}/${year}`;
@@ -2273,10 +2382,9 @@
       document.getElementById('eod-date').value = formattedDate;
       document.getElementById('eod-day').value = capitalizedDay;
       calculateEODTotals();
-      renderEODOperationalQuestions();
+      await initEODLiveDraft();
     }
 
-    // DIRECT EMAILJS DISPATCH FUNCTION FOR BACK OFFICE BUTTON & FORM SUBMISSIONS
     window.sendEODSummaryEmail = async function(isAuto = false) {
       const btn = document.getElementById('send-eod-btn');
       if (btn) btn.disabled = true;
@@ -2383,7 +2491,6 @@
       const totalEftpos = eftpos1 + eftpos2;
       const grandTotal = totalCash + totalEftpos + onlineBooking + bankTransfer;
 
-      // Matches the rebuilt eod_responses table exactly - one plain column per value.
       const reportData = {
         shift_date: shiftDateISO,
         day_name: dayName,
@@ -2411,8 +2518,6 @@
           .from('eod_responses')
           .insert([reportData]);
 
-        // A failed save must never look like a success - surface it instead
-        // of the old console.warn-only behaviour.
         if (dbError) throw dbError;
 
         const reportJsonString = JSON.stringify(reportData, null, 2);
@@ -2466,15 +2571,15 @@
         document.getElementById('eod-takings-form').reset();
         workersToday = [];
         renderWorkersList();
-        localStorage.removeItem(getEODQuestionsStateKey());
-        renderEODOperationalQuestions();
+        await supabaseClient.from('eod_live_progress').delete().eq('shift_date', shiftDateISO);
+        currentEODQuestionsState = getInitialEODQuestionsState();
+        renderEODOperationalQuestionsUI();
       } catch (err) {
         msgDiv.className = 'error-message';
         msgDiv.textContent = 'Submission error: ' + (err.message || err);
       }
     }
 
-    // TASK LISTING & DAY SELECTOR CONTROLLER
     window.selectDay = async function(dayName, isSilent = false) {
       currentSelectedDay = dayName.toLowerCase();
       currentSelectedDateISO = getDateForDayOfWeek(currentSelectedDay);
@@ -2591,7 +2696,6 @@
             <input type="checkbox" class="task-checkbox" ${isCompleted ? 'checked' : ''} onchange="toggleTaskCompletion('${task.id}', this.checked)">
             <div class="task-label">
               <strong>${escapeHtml(task.title)}</strong>
-              <span style="font-size: 0.75rem; color: var(--flipout-pink); margin-left: 6px;">[${escapeHtml(task.category || 'General')}]</span>
               ${task.is_temporary ? '<span class="badge-temp" style="margin-left: 6px;">TEMP</span>' : ''}
             </div>
           </div>
@@ -2720,7 +2824,6 @@
       }
     };
 
-    // BACK OFFICE TASK & JOB MANAGEMENT
     window.filterAdminTasks = function(filter, element) {
       activeAdminFilter = filter;
       adminFilterTabs.forEach(t => t.classList.remove('active'));
@@ -2936,7 +3039,6 @@
       }
     };
 
-    // LEADERBOARD & EXPORT SERVICES
     window.loadStaffPerformance = async function(isSilent = false) {
       const container = document.getElementById('modal-staff-performance-container');
       if (!container && !isSilent) return;
@@ -3017,7 +3119,6 @@
       }
     };
 
-    // DOM CONTENT LOADED INITIALISATION INVOCATION
     window.addEventListener('DOMContentLoaded', () => {
       initialiseApp();
     });

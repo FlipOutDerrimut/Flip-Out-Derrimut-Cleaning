@@ -902,7 +902,7 @@
     </div>
 
     <div class="brand-header">
-      <img src="FO Derrimut-01.png" alt="Flip Out Derrimut Logo" class="brand-logo">
+      <img src="FO Derrimut-01.png" alt="Flip Out Derrimut Logo" class="brand-logo" onclick="handleSecretLogoTap()">
       <div class="sub-title">Daily Operations Checklist</div>
       <img src="14.png" alt="Jet and Max Ninjas" class="mascot-hero-right">
     </div>
@@ -1396,6 +1396,68 @@
       <h3 class="reward-title">FLIP-TASTIC WORK!</h3>
       <p id="reward-message" class="reward-text"></p>
       <button onclick="closeRewardModal()" class="btn-primary">Keep Crushing It!</button>
+    </div>
+  </div>
+
+  <div id="secret-menu-screen" class="container hidden">
+    <div class="brand-header">
+      <img src="FO Derrimut-01.png" alt="Flip Out Derrimut Logo" class="brand-logo" style="max-width: 170px;">
+      <div class="sub-title" style="color: var(--flipout-pink);">🥷 TOP SECRET MENU 🥷</div>
+    </div>
+
+    <div class="eod-card eod-card-green" style="text-align:center;">
+      <p style="margin:0; color: var(--text-light);">You found the secret combo! Answer 5 Flip Out trivia questions correctly to unlock something fun.</p>
+    </div>
+
+    <div id="secret-quiz-container"></div>
+
+    <div class="footer" style="justify-content:center;">
+      <button type="button" onclick="exitSecretMenu()" class="admin-link">← Back to Portal</button>
+    </div>
+  </div>
+
+  <div id="secret-game-select-screen" class="container hidden">
+    <div class="brand-header">
+      <div class="sub-title" style="color: var(--flipout-green);">🎮 CHOOSE YOUR GAME</div>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:12px;">
+      <button type="button" class="btn-primary" onclick="launchSecretGame('snake')">🐍 Ninja Snake</button>
+      <button type="button" class="btn-secondary" style="padding:0.9rem; font-weight:800; text-transform:uppercase; border-radius:10px;" onclick="launchSecretGame('chomp')">😋 Flip Chomp</button>
+    </div>
+
+    <div class="footer" style="justify-content:center;">
+      <button type="button" onclick="exitSecretMenu()" class="admin-link">← Back to Portal</button>
+    </div>
+  </div>
+
+  <div id="secret-game-screen" class="container hidden">
+    <div id="secret-game-disclaimer" class="approval-window">
+      <h3 style="margin-top: 0; margin-bottom: 0.5rem; font-size: 1.1rem; color: var(--warning);">🥷 A message from Ref</h3>
+      <p style="font-size: 0.9rem; color: var(--text-light); margin-bottom: 1rem;">This one's for your break, not the clock! Play fair, play smart, and jump back into work mode when you're done. 😉</p>
+      <button type="button" class="btn-primary" onclick="confirmSecretGameDisclaimer()">Got it, let's play!</button>
+    </div>
+
+    <div id="secret-game-area" class="hidden" style="text-align:center;">
+      <div id="secret-game-score" style="font-family:'Unbounded', sans-serif; color: var(--flipout-green); font-size:1.1rem; margin-bottom:0.75rem;">Score: 0</div>
+      <div id="secret-game-canvas-wrapper" style="display:inline-block; position:relative; border:2px solid var(--flipout-green); border-radius:10px; overflow:hidden;">
+        <canvas id="secret-game-canvas" style="display:block; max-width:100%;"></canvas>
+      </div>
+      <div id="secret-game-controls" style="display:grid; grid-template-columns:56px 56px 56px; grid-template-rows:56px 56px 56px; gap:6px; justify-content:center; margin: 1rem auto 0;">
+        <div></div>
+        <button type="button" class="btn-counter" style="width:56px;height:56px;" onclick="secretGameDirectionInput(-1,0)">▲</button>
+        <div></div>
+        <button type="button" class="btn-counter" style="width:56px;height:56px;" onclick="secretGameDirectionInput(0,-1)">◀</button>
+        <div></div>
+        <button type="button" class="btn-counter" style="width:56px;height:56px;" onclick="secretGameDirectionInput(0,1)">▶</button>
+        <div></div>
+        <button type="button" class="btn-counter" style="width:56px;height:56px;" onclick="secretGameDirectionInput(1,0)">▼</button>
+        <div></div>
+      </div>
+    </div>
+
+    <div class="footer" style="justify-content:center;">
+      <button type="button" onclick="exitSecretMenu()" class="admin-link">← Back to Portal</button>
     </div>
   </div>
 
@@ -3118,6 +3180,447 @@
         alert('Export CSV failed: ' + err.message);
       }
     };
+
+    let secretTapCount = 0;
+    let secretTapTimer = null;
+
+    window.handleSecretLogoTap = function() {
+      secretTapCount++;
+      clearTimeout(secretTapTimer);
+      secretTapTimer = setTimeout(() => { secretTapCount = 0; }, 3000);
+      if (secretTapCount >= 5) {
+        secretTapCount = 0;
+        clearTimeout(secretTapTimer);
+        openSecretMenu();
+      }
+    };
+
+    const TRIVIA_POOL = [
+      { q: "What colour is Jet the Ninja's outfit?", options: ["Green", "Pink", "Purple", "Black"], correct: 0 },
+      { q: "Which Ninja is known as the speedster of the crew?", options: ["Jet", "Max", "Dash", "Roo"], correct: 2 },
+      { q: "What is Max's special move called?", options: ["Sky Flip", "Spin Spark", "Lightning Dash", "Red Card"], correct: 1 },
+      { q: "Which Ninja looks after the little ones and the Mini Ninjas?", options: ["Ref", "Roo", "Dash", "Jet"], correct: 1 },
+      { q: "What is Ref's special move?", options: ["Red Card", "Spring Shield", "Sky Flip", "Spin Spark"], correct: 0 },
+      { q: "Complete the Flip Out tagline: 'Never stop creating ___'", options: ["Chaos", "Fun", "Memories", "Flips"], correct: 1 },
+      { q: "Which of these is NOT one of Flip Out's core values?", options: ["Family Values", "Healthy Living", "Open To All", "Fastest Growing"], correct: 3 },
+      { q: "What does 'Flipability' mean at Flip Out?", options: ["A gymnastics class", "Fun for every body", "A discount card", "A staff bonus"], correct: 1 },
+      { q: "How much is the morning till float at Flip Out Derrimut?", options: ["$100", "$200", "$300", "$500"], correct: 2 },
+      { q: "After how many minutes of Back Office inactivity does it auto sign out?", options: ["5 minutes", "10 minutes", "15 minutes", "30 minutes"], correct: 2 },
+      { q: "What deal happens every Tuesday?", options: ["Manic Mondays", "2 For Tuesday", "Flip-X", "Off-Peak Pass"], correct: 1 },
+      { q: "Which of these is one of Flip Out's 3 primary brand colours?", options: ["Orange", "Purple", "Red", "Blue"], correct: 1 }
+    ];
+
+    function shuffleArray(arr) {
+      const a = [...arr];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    let secretQuizQuestions = [];
+    let secretQuizIndex = 0;
+    let secretQuizCorrectCount = 0;
+
+    window.openSecretMenu = function() {
+      mainApp.classList.add('hidden');
+      document.getElementById('secret-menu-screen').classList.remove('hidden');
+      startSecretQuiz();
+    };
+
+    function startSecretQuiz() {
+      secretQuizQuestions = shuffleArray(TRIVIA_POOL).slice(0, 5);
+      secretQuizIndex = 0;
+      secretQuizCorrectCount = 0;
+      renderSecretQuizQuestion();
+    }
+
+    function renderSecretQuizQuestion() {
+      const container = document.getElementById('secret-quiz-container');
+      if (secretQuizIndex >= secretQuizQuestions.length) {
+        showSecretQuizResult(secretQuizCorrectCount === secretQuizQuestions.length);
+        return;
+      }
+
+      const q = secretQuizQuestions[secretQuizIndex];
+      container.innerHTML = `
+        <div class="eod-q-box">
+          <div class="eod-q-title">Question ${secretQuizIndex + 1} of ${secretQuizQuestions.length}</div>
+          <p style="font-size:1rem; font-weight:700; margin-bottom:1rem;">${escapeHtml(q.q)}</p>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            ${q.options.map((opt, idx) => `
+              <button type="button" class="btn-secondary secret-quiz-answer-btn" style="text-align:left;" onclick="answerSecretQuiz(${idx})">${escapeHtml(opt)}</button>
+            `).join('')}
+          </div>
+          <div id="secret-quiz-feedback" style="margin-top:0.75rem; font-weight:700;"></div>
+        </div>
+      `;
+    }
+
+    window.answerSecretQuiz = function(idx) {
+      const q = secretQuizQuestions[secretQuizIndex];
+      const feedback = document.getElementById('secret-quiz-feedback');
+      document.querySelectorAll('.secret-quiz-answer-btn').forEach(b => b.disabled = true);
+
+      if (idx === q.correct) {
+        secretQuizCorrectCount++;
+        feedback.style.color = 'var(--flipout-green)';
+        feedback.textContent = '✓ Correct!';
+      } else {
+        feedback.style.color = 'var(--danger)';
+        feedback.textContent = `✗ Not quite - the answer was "${q.options[q.correct]}".`;
+      }
+
+      setTimeout(() => {
+        secretQuizIndex++;
+        renderSecretQuizQuestion();
+      }, 1200);
+    };
+
+    function showSecretQuizResult(passed) {
+      const container = document.getElementById('secret-quiz-container');
+      if (passed) {
+        container.innerHTML = `
+          <div class="eod-q-box" style="text-align:center;">
+            <div class="eod-q-title" style="color:var(--flipout-green); font-size:1.2rem;">🎉 5 for 5! You're a true Flip Out legend.</div>
+            <button type="button" class="btn-primary" style="margin-top:1rem;" onclick="showSecretGameSelect()">Unlock the secret game →</button>
+          </div>
+        `;
+      } else {
+        container.innerHTML = `
+          <div class="eod-q-box" style="text-align:center;">
+            <div class="eod-q-title" style="color:var(--flipout-pink); font-size:1.2rem;">So close! You got ${secretQuizCorrectCount}/${secretQuizQuestions.length}.</div>
+            <p style="color:var(--text-muted); margin-bottom:1rem;">Give it another go?</p>
+            <button type="button" class="btn-primary" onclick="startSecretQuiz()">Try Again</button>
+          </div>
+        `;
+      }
+    }
+
+    window.showSecretGameSelect = function() {
+      document.getElementById('secret-menu-screen').classList.add('hidden');
+      document.getElementById('secret-game-select-screen').classList.remove('hidden');
+    };
+
+    let pendingSecretGameType = null;
+
+    window.launchSecretGame = function(gameType) {
+      pendingSecretGameType = gameType;
+      document.getElementById('secret-game-select-screen').classList.add('hidden');
+      document.getElementById('secret-game-screen').classList.remove('hidden');
+      document.getElementById('secret-game-disclaimer').classList.remove('hidden');
+      document.getElementById('secret-game-area').classList.add('hidden');
+    };
+
+    window.confirmSecretGameDisclaimer = function() {
+      document.getElementById('secret-game-disclaimer').classList.add('hidden');
+      document.getElementById('secret-game-area').classList.remove('hidden');
+      if (pendingSecretGameType === 'snake') {
+        startNinjaSnakeGame();
+      } else if (pendingSecretGameType === 'chomp') {
+        startFlipChompGame();
+      }
+    };
+
+    window.exitSecretMenu = function() {
+      clearInterval(snakeGameInterval);
+      clearInterval(chompInterval);
+      document.getElementById('secret-menu-screen').classList.add('hidden');
+      document.getElementById('secret-game-select-screen').classList.add('hidden');
+      document.getElementById('secret-game-screen').classList.add('hidden');
+      showMainApp();
+    };
+
+    function removeSecretGameOverOverlay() {
+      const existing = document.getElementById('secret-game-over-overlay');
+      if (existing) existing.remove();
+    }
+
+    function showSecretGameOver(gameName, score, retryFn) {
+      const overlay = document.createElement('div');
+      overlay.id = 'secret-game-over-overlay';
+      overlay.style.cssText = 'position:absolute; inset:0; background:rgba(15,4,29,0.92); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; z-index:10; padding: 1rem; text-align:center;';
+      overlay.innerHTML = `
+        <div style="font-family:'Unbounded',sans-serif; color:var(--flipout-green); font-size:1.3rem;">GAME OVER</div>
+        <div style="color:#fff;">${escapeHtml(gameName)} score: <strong>${score}</strong></div>
+        <button type="button" class="btn-primary" style="width:auto; padding:0.7rem 1.5rem;" id="secret-game-retry-btn">Play Again</button>
+        <button type="button" class="admin-link" style="color:#fff;" onclick="showSecretGameSelect()">Choose another game</button>
+      `;
+      document.getElementById('secret-game-canvas-wrapper').appendChild(overlay);
+      document.getElementById('secret-game-retry-btn').onclick = () => {
+        overlay.remove();
+        retryFn();
+      };
+    }
+
+    let snakeGameState = null;
+    let snakeGameInterval = null;
+
+    function startNinjaSnakeGame() {
+      removeSecretGameOverOverlay();
+      const canvas = document.getElementById('secret-game-canvas');
+      canvas.width = 320;
+      canvas.height = 320;
+      const ctx = canvas.getContext('2d');
+      const gridSize = 16;
+      const cols = canvas.width / gridSize;
+      const rows = canvas.height / gridSize;
+
+      snakeGameState = {
+        snake: [{x: 8, y: 8}],
+        direction: {x: 1, y: 0},
+        nextDirection: {x: 1, y: 0},
+        token: {x: 3, y: 3},
+        score: 0,
+        gameOver: false
+      };
+
+      function randomEmptyCell() {
+        let cell;
+        do {
+          cell = { x: Math.floor(Math.random() * cols), y: Math.floor(Math.random() * rows) };
+        } while (snakeGameState.snake.some(s => s.x === cell.x && s.y === cell.y));
+        return cell;
+      }
+      snakeGameState.token = randomEmptyCell();
+
+      document.getElementById('secret-game-score').textContent = 'Score: 0';
+      clearInterval(snakeGameInterval);
+
+      function draw() {
+        ctx.fillStyle = '#0A0314';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.fillStyle = '#FF509F';
+        ctx.beginPath();
+        ctx.arc(
+          snakeGameState.token.x * gridSize + gridSize / 2,
+          snakeGameState.token.y * gridSize + gridSize / 2,
+          gridSize / 2 - 2, 0, Math.PI * 2
+        );
+        ctx.fill();
+
+        snakeGameState.snake.forEach((seg, i) => {
+          ctx.fillStyle = i === 0 ? '#99C63E' : '#7BA828';
+          ctx.fillRect(seg.x * gridSize + 1, seg.y * gridSize + 1, gridSize - 2, gridSize - 2);
+          if (i === 0) {
+            ctx.fillStyle = '#0F041D';
+            ctx.fillRect(seg.x * gridSize + 2, seg.y * gridSize + 4, gridSize - 4, 3);
+          }
+        });
+      }
+
+      function tick() {
+        if (snakeGameState.gameOver) return;
+        snakeGameState.direction = snakeGameState.nextDirection;
+        const head = snakeGameState.snake[0];
+        const newHead = { x: head.x + snakeGameState.direction.x, y: head.y + snakeGameState.direction.y };
+
+        if (newHead.x < 0 || newHead.x >= cols || newHead.y < 0 || newHead.y >= rows ||
+            snakeGameState.snake.some(s => s.x === newHead.x && s.y === newHead.y)) {
+          snakeGameState.gameOver = true;
+          clearInterval(snakeGameInterval);
+          showSecretGameOver('Ninja Snake', snakeGameState.score, startNinjaSnakeGame);
+          return;
+        }
+
+        snakeGameState.snake.unshift(newHead);
+
+        if (newHead.x === snakeGameState.token.x && newHead.y === snakeGameState.token.y) {
+          snakeGameState.score++;
+          document.getElementById('secret-game-score').textContent = `Score: ${snakeGameState.score}`;
+          snakeGameState.token = randomEmptyCell();
+        } else {
+          snakeGameState.snake.pop();
+        }
+
+        draw();
+      }
+
+      draw();
+      snakeGameInterval = setInterval(tick, 140);
+    }
+
+    window.setSnakeDirection = function(dx, dy) {
+      if (!snakeGameState || snakeGameState.gameOver) return;
+      if (snakeGameState.direction.x === -dx && snakeGameState.direction.y === -dy) return;
+      snakeGameState.nextDirection = { x: dx, y: dy };
+    };
+
+    const CHOMP_MAZE = [
+      "#############",
+      "#...........#",
+      "#.##.###.##.#",
+      "#...........#",
+      "#.#.#.#.#.#.#",
+      "#...........#",
+      "#.###.#.###.#",
+      "#...........#",
+      "#.#.#.#.#.#.#",
+      "#...........#",
+      "#.##.###.##.#",
+      "#...........#",
+      "#############"
+    ];
+
+    let chompState = null;
+    let chompInterval = null;
+
+    function startFlipChompGame() {
+      removeSecretGameOverOverlay();
+      const canvas = document.getElementById('secret-game-canvas');
+      const cell = 24;
+      canvas.width = CHOMP_MAZE[0].length * cell;
+      canvas.height = CHOMP_MAZE.length * cell;
+      const ctx = canvas.getContext('2d');
+
+      const wallGrid = CHOMP_MAZE.map(row => row.split('').map(c => c === '#'));
+      const dotGrid = CHOMP_MAZE.map(row => row.split('').map(c => c === '.'));
+
+      chompState = {
+        player: { row: 1, col: 1, dir: { r: 0, c: 1 }, mouthOpen: true },
+        chasers: [
+          { row: 6, col: 6, color: '#8D2D91' },
+          { row: 11, col: 11, color: '#0F041D' }
+        ],
+        dotsRemaining: dotGrid.flat().filter(Boolean).length,
+        score: 0,
+        gameOver: false
+      };
+
+      document.getElementById('secret-game-score').textContent = 'Score: 0';
+      clearInterval(chompInterval);
+
+      function isOpen(row, col) {
+        if (row < 0 || row >= wallGrid.length || col < 0 || col >= wallGrid[0].length) return false;
+        return !wallGrid[row][col];
+      }
+
+      function drawPlayer() {
+        const p = chompState.player;
+        const px = p.col * cell + cell / 2;
+        const py = p.row * cell + cell / 2;
+        const radius = cell / 2 - 2;
+
+        ctx.fillStyle = '#99C63E';
+        ctx.beginPath();
+        ctx.arc(px, py, radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        const angle = Math.atan2(p.dir.r, p.dir.c);
+        const mouthWidth = p.mouthOpen ? 0.6 : 0.15;
+        ctx.fillStyle = '#0A0314';
+        ctx.beginPath();
+        ctx.moveTo(px, py);
+        ctx.arc(px, py, radius, angle - mouthWidth, angle + mouthWidth);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      function draw() {
+        ctx.fillStyle = '#0A0314';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        for (let r = 0; r < wallGrid.length; r++) {
+          for (let c = 0; c < wallGrid[0].length; c++) {
+            if (wallGrid[r][c]) {
+              ctx.fillStyle = '#8D2DD3';
+              ctx.fillRect(c * cell, r * cell, cell, cell);
+            } else if (dotGrid[r][c]) {
+              ctx.fillStyle = '#FF509F';
+              ctx.beginPath();
+              ctx.arc(c * cell + cell / 2, r * cell + cell / 2, 3, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          }
+        }
+
+        drawPlayer();
+
+        chompState.chasers.forEach(ch => {
+          ctx.fillStyle = ch.color;
+          ctx.beginPath();
+          ctx.arc(ch.col * cell + cell / 2, ch.row * cell + cell / 2, cell / 2 - 2, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
+
+      function moveChaser(ch) {
+        const options = [{ r: -1, c: 0 }, { r: 1, c: 0 }, { r: 0, c: -1 }, { r: 0, c: 1 }]
+          .filter(d => isOpen(ch.row + d.r, ch.col + d.c));
+        if (options.length === 0) return;
+        options.sort((a, b) => {
+          const da = Math.abs((ch.row + a.r) - chompState.player.row) + Math.abs((ch.col + a.c) - chompState.player.col);
+          const db = Math.abs((ch.row + b.r) - chompState.player.row) + Math.abs((ch.col + b.c) - chompState.player.col);
+          return da - db;
+        });
+        const choice = Math.random() < 0.75 ? options[0] : options[Math.floor(Math.random() * options.length)];
+        ch.row += choice.r;
+        ch.col += choice.c;
+      }
+
+      function tick() {
+        if (chompState.gameOver) return;
+        const p = chompState.player;
+        p.mouthOpen = !p.mouthOpen;
+
+        if (isOpen(p.row + p.dir.r, p.col + p.dir.c)) {
+          p.row += p.dir.r;
+          p.col += p.dir.c;
+        }
+
+        if (dotGrid[p.row][p.col]) {
+          dotGrid[p.row][p.col] = false;
+          chompState.score += 10;
+          chompState.dotsRemaining--;
+          document.getElementById('secret-game-score').textContent = `Score: ${chompState.score}`;
+        }
+
+        chompState.chasers.forEach(moveChaser);
+
+        if (chompState.chasers.some(ch => ch.row === p.row && ch.col === p.col)) {
+          chompState.gameOver = true;
+          clearInterval(chompInterval);
+          draw();
+          showSecretGameOver('Flip Chomp', chompState.score, startFlipChompGame);
+          return;
+        }
+
+        if (chompState.dotsRemaining <= 0) {
+          chompState.gameOver = true;
+          clearInterval(chompInterval);
+          draw();
+          showSecretGameOver('Flip Chomp - maze cleared! 🎉', chompState.score, startFlipChompGame);
+          return;
+        }
+
+        draw();
+      }
+
+      draw();
+      chompInterval = setInterval(tick, 220);
+    }
+
+    window.setChompDirection = function(r, c) {
+      if (!chompState || chompState.gameOver) return;
+      chompState.player.dir = { r, c };
+    };
+
+    window.secretGameDirectionInput = function(rowDelta, colDelta) {
+      if (pendingSecretGameType === 'snake') {
+        setSnakeDirection(colDelta, rowDelta);
+      } else if (pendingSecretGameType === 'chomp') {
+        setChompDirection(rowDelta, colDelta);
+      }
+    };
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowUp') secretGameDirectionInput(-1, 0);
+      else if (e.key === 'ArrowDown') secretGameDirectionInput(1, 0);
+      else if (e.key === 'ArrowLeft') secretGameDirectionInput(0, -1);
+      else if (e.key === 'ArrowRight') secretGameDirectionInput(0, 1);
+    });
 
     window.addEventListener('DOMContentLoaded', () => {
       initialiseApp();
